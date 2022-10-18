@@ -79,47 +79,21 @@ async fn run_s3_operations(
     Ok(msgs.join("\n\t"))
 }
 
-// TMP
-//use crate::s3_file;
-//use crate::lib;
+// TMP:  remove/comment the feature-flag #[cfg(test)]  in file lib.rs
 use S3_file::tests;
-// use S3_file::s3_file;
-// use std::io::Read;
-
-// pub async fn read_from_s3_aux(test_data: &[u8]) -> (Box<[u8]>, u32) {
-//     let (region, client, bucket_name, file_name, object_name, target_key) = setup().await;
-//     println!("About to create {bucket_name}.");
-
-//     s3_service::create_bucket(&client, &bucket_name, region.as_ref()).await.expect("Failed to create bucket");
-
-//     // create the file for testing
-//     s3_service::upload_object(&client, &bucket_name, &file_name, &object_name, test_data).await;
-//     println!("Created s3-object");
-
-//     // test 1
-//     let mut s3file_1 = s3_file::new(bucket_name.to_owned(), object_name.clone(), 10);
-
-//     println!("Created s3-object");
-//     let buff_len = 10;
-//     let mut buff: Box<[u8]> = vec![0;buff_len].into_boxed_slice();
-
-//     s3file_1.read(&mut buff).expect("Failed to read S3-object");
-
-//     (buff, 123)
-// }
-
 
 // normal main used for console operation
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        // disable printing the name of the module in every log line.
-        .with_target(false)
-        // disabling time is handy because CloudWatch will add the ingestion time.
-        .without_time()
-        .init();
+    // tracing_subscriber::fmt()
+    //     .with_max_level(tracing::Level::INFO)
+    //     // disable printing the name of the module in every log line.
+    //     .with_target(false)
+    //     // disabling time is handy because CloudWatch will add the ingestion time.
+    //     .without_time()
+    //     .init();
 
+    // run tests from main
     println!("About to enter async function.");
     let results = tests::read_from_s3_aux(s3_service::UPLOAD_CONTENT).await;
     println!("\n----------------\nresults are results.0={:?} and as string: {:?}", &results.0, str::from_utf8(&results.0));

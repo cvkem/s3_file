@@ -77,7 +77,7 @@ impl s3_file {
     fn get_block_from_store(&mut self, start: usize) -> usize {
         let block_start = (start / self.block_size) * self.block_size;
         //let end_block = cmp::min(block_start + self.block_size, self.get_length());
-        let block_end = block_start + self.block_size;
+        let block_end = block_start + self.block_size - 1;  // end is inclusive
 
         // create the block and fill it with data
         let range = format!("bytes={block_start}-{block_end}");
@@ -119,10 +119,11 @@ impl s3_file {
         let block_idx = self.find_cached_block(self.position);
         let block = &self.cache[block_idx];
         let relative_position = self.position - block.start;
-        let read_len = cmp::min(max_len, block.data.len() - relative_position + 1);
+        let read_len = cmp::min(max_len, block.data.len() - relative_position);
 
         let src_slice = block.data.slice(relative_position..relative_position+read_len);
-        buffer.copy_from_slice(&src_slice);
+        let dst_slice = &mut buffer[0..read_len];
+        dst_slice.copy_from_slice(&src_slice);
         self.position += read_len;
         // copy data
         // let src_ptr = block.data.slice(relative_position..relative_position+read_len).as_ptr();
@@ -194,7 +195,7 @@ pub mod tests {
         println!("Created s3-object");
 
         // test 1
-        let mut s3file_1 = s3_file::new(bucket_name.to_owned(), object_name.clone(), 100);
+        let mut s3file_1 = s3_file::new(bucket_name.to_owned(), object_name.clone(), 10);
 
         println!("Read s3-object");
         let buff_len = 10;
@@ -219,7 +220,8 @@ pub mod tests {
         println!("About to enter async function.");
         let results = read_from_s3_aux(s3_service::UPLOAD_CONTENT).await;
         
-        assert_eq!(results.0.as_ref(), b"0123456789");
-        assert_eq!(results.1, 123);
+        assert_eq!(results.0.as_ref(), b"\nabcdefgh\n");
+        assert_eq!(&results.1.as_ref(), b"Hello world!\n\nAnd");
+        assert_eq!(results.2.as_ref(), b" a whole l");
     }
 }
