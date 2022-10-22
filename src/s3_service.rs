@@ -95,7 +95,7 @@ pub async fn download_object(client: &Client, bucket_name: &str, key: &str, rang
         .set_range(range)
         .bucket(bucket_name)
         .key(key);
-    println!("\nPrepared Download request = {:?}\n", &prep_resp);
+//    println!("\nPrepared Download request = {:?}\n", &prep_resp);
     let resp = prep_resp    
         .send()
         .await;

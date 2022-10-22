@@ -2,10 +2,11 @@
 use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Client, Error, Region};
 use aws_config::meta::region::RegionProviderChain;
-use std::io::{Read, Result as IOResult};
+use std::io::{Read, Result as IOResult, Seek, SeekFrom};
 use std::time::Instant;
 use std::any::type_name;
 use std::ptr;
+use std::str;
 use std::cmp;
 use bytes::Bytes;
 use futures::executor::block_on;
@@ -20,11 +21,11 @@ struct ObjBlock {
     data: Bytes
 }
 
-pub struct s3_file {
+pub struct S3File {
     client: Client,
     pub bucket: String,
     pub object: String,
-    pub position: usize,
+    position: usize,
     block_size: usize,
     length: Option<usize>,
     cache: Vec<ObjBlock>
@@ -38,10 +39,10 @@ async fn get_client() -> Client {
     Client::new(&shared_config)
 }
 
-impl s3_file {
+impl S3File {
 
     
-    // create a new S3_file with an LRU-cache to support fast (sequential) read operations
+    // create a new S3File with an LRU-cache to support fast (sequential) read operations
     pub fn new(bucket: String, object: String, block_size: usize) -> Self {
         Self{client: block_on(get_client()), 
             bucket, 
@@ -69,10 +70,6 @@ impl s3_file {
         self.cache.remove(oldest_idx);
     }
 
-    // fn get_length(&mut self) -> usize {
-    //     self.length.get_or_insert_with(|| s3_service::get_length())
-    // }
-
     // append a block to the cache that contains the byte start and append it to the cache
     fn get_block_from_store(&mut self, start: usize) -> usize {
         let block_start = (start / self.block_size) * self.block_size;
@@ -81,21 +78,26 @@ impl s3_file {
 
         // create the block and fill it with data
         let range = format!("bytes={block_start}-{block_end}");
-        println!("\n\n=====================\nAbout to fetch object {}::{} for range='{}'", &self.bucket, &self.object, &range);
-        let get_obj_output = block_on(s3_service::download_object(&self.client, &self.bucket, &self.object, Some(range)));
-        println!("Received object {:?}", get_obj_output);
-        // set length when nog readily available, as we get this information free of charge here.
-        _ = self.length.get_or_insert(get_obj_output.content_length() as usize);
-        let agg_bytes = block_on(get_obj_output.body.collect()).expect("Failed to read data");
-        // turn into bytes and take a (ref-counted) full slice out of it (reuse of same buffer)
-        // Operating on AggregatedBytes directy would be more memory efficient (however, working with non-continguous memory in that case)
-        let data = agg_bytes.into_bytes();
-        let mut new_block = ObjBlock {
-            start: block_start,
-            last_used: Instant::now(),
-            data
+        println!("\nAbout to fetch object {}::{} for range='{}'", &self.bucket, &self.object, &range);
+        let f = async {
+            let get_obj_output = s3_service::download_object(&self.client, &self.bucket, &self.object, Some(range)).await;
+            println!("Received object {:?}", get_obj_output);
+            // set length when nog readily available, as we get this information free of charge here.
+            _ = self.length.get_or_insert(get_obj_output.content_length() as usize);
+            let agg_bytes = get_obj_output.body.collect().await.expect("Failed to read data");
+            println!("Received bytes {:?}", agg_bytes);
+            // turn into bytes and take a (ref-counted) full slice out of it (reuse of same buffer)
+            // Operating on AggregatedBytes directy would be more memory efficient (however, working with non-continguous memory in that case)
+            let data = agg_bytes.into_bytes();
+            let mut new_block = ObjBlock {
+                start: block_start,
+                last_used: Instant::now(),
+                data
+            };
+            self.cache.push(new_block);
+            println!("Pushed the block to the cache. Current length={}", self.cache.len());
         };
-        self.cache.push(new_block);
+        block_on(f);
         self.cache.len() - 1
     }
 
@@ -136,17 +138,19 @@ impl s3_file {
     }
 }
 
-impl Read for s3_file {
+impl Read for S3File {
     fn read(&mut self, buff: &mut [u8]) -> IOResult<usize> {
         let buff_len = buff.len();
         let mut read_len = 0;
         let mut window: &mut  [u8] = buff;
         while buff_len - read_len > 0 {
+            println!("Read segment after {} bytes to Window for at most {} bytes.", read_len, buff_len - read_len);
             let len = self.read_segment(window, buff_len - read_len);
             //shift the window forward (position has been updated already)
             window = &mut window[len..];
             read_len += len;
         }
+        println!("Read buff '{}'.", str::from_utf8(&buff).unwrap());
         Ok(read_len)
     }
 }
@@ -164,7 +168,7 @@ pub mod tests {
     use std::io::Read;
 
     use crate::s3_service;
-    use crate::{s3_file, REGION};
+    use crate::{S3File, REGION};
     
     async fn setup() -> (Region, Client, String, String, String, String) {
         let region_provider = RegionProviderChain::first_try(Region::new(REGION));
@@ -181,23 +185,14 @@ pub mod tests {
         (region, client, bucket_name, file_name, key, target_key)
     }
 
-
-    pub async fn read_from_s3_aux(test_data: &[u8]) -> (Box<[u8]>, Box<[u8]>,Box<[u8]>) {
-        let (region, client, bucket_name, file_name, object_name, target_key) = setup().await;
-        println!("About to create {bucket_name}.");
-
-        s3_service::create_bucket(&client, &bucket_name, region.as_ref()).await.expect("Failed to create bucket");
     
-        // create the file for testing
 
-        println!("About to create object {bucket_name}::{object_name}.");
-        s3_service::upload_object(&client, &bucket_name, &file_name, &object_name, test_data).await.expect("Failed to create Object in bucket");
-        println!("Created s3-object");
-
+    pub fn test_read_S3File_aux(bucket_name: Option<&str>, object_name: &str) -> (Box<[u8]>, Box<[u8]>,Box<[u8]>) {
+        // use a default bucket if none is specified
+        let bucket_name = bucket_name.unwrap_or(&"doc-example-bucket-f895604e-164e-4587-9d6c-bc3b7da55fa2");
         // test 1
-        let mut s3file_1 = s3_file::new(bucket_name.to_owned(), object_name.clone(), 10);
+        let mut s3file_1 = S3File::new(bucket_name.to_owned(), object_name.to_string(), 10);
 
-        println!("Read s3-object");
         let buff_len = 10;
         let mut buff1: Box<[u8]> = vec![0;buff_len].into_boxed_slice();
         let mut buff2: Box<[u8]> = vec![0;buff_len+7].into_boxed_slice();
@@ -210,18 +205,29 @@ pub mod tests {
         s3file_1.read(&mut buff3).expect("Failed to read S3-object (buff_3)");
 
         (buff1, buff2, buff3)
+
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_read_S3File() {
+        let (b1, b2, b3) = test_read_S3File_aux(None, &"test file key name");
+        println!("\tb1={:?}\n\tb2={:?}\n\tb3={:?}", b1, b2, b2);
+        assert_eq!(b1.as_ref(), b"\nabcdefgh\n");
+        assert_eq!(b2.as_ref(), b"Hello world!\n\nAnd");
+        assert_eq!(b3.as_ref(), b" a whole l");
+
+    }
+
+    // create a test-input file and run the test.
+    pub async fn read_from_s3_aux(test_data: &[u8]) -> (Box<[u8]>, Box<[u8]>,Box<[u8]>) {
+        let (region, client, bucket_name, file_name, object_name, target_key) = setup().await;
+        s3_service::create_bucket(&client, &bucket_name, region.as_ref()).await.expect("Failed to create bucket");
+    
+        // create the file for testing
+        s3_service::upload_object(&client, &bucket_name, &file_name, &object_name, test_data).await.expect("Failed to create Object in bucket");
+
+        // the actual test.
+        test_read_S3File_aux(Some(&bucket_name), &object_name)
     }
     
-    #[tokio::test]
-    //#[test]
-    async fn read_from_s3() {
-        //write a dummy_test_file to a bucket
-        //let results = block_on(read_from_s3_aux(s3_service::UPLOAD_CONTENT));
-        println!("About to enter async function.");
-        let results = read_from_s3_aux(s3_service::UPLOAD_CONTENT).await;
-        
-        assert_eq!(results.0.as_ref(), b"\nabcdefgh\n");
-        assert_eq!(&results.1.as_ref(), b"Hello world!\n\nAnd");
-        assert_eq!(results.2.as_ref(), b" a whole l");
-    }
 }
