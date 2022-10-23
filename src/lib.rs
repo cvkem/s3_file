@@ -1,8 +1,8 @@
 
-use aws_sdk_s3::types::ByteStream;
-use aws_sdk_s3::{Client, Error, Region};
+use aws_sdk_s3::{Client, Error, Region,
+    types::ByteStream};
 use aws_config::meta::region::RegionProviderChain;
-use std::io::{Read, Result as IOResult, Seek, SeekFrom};
+use std::io::{Read, Result as IOResult, Seek, SeekFrom, Error as IOError, ErrorKind as IOErrorKind};
 use std::time::Instant;
 use std::any::type_name;
 use std::ptr;
@@ -136,6 +136,16 @@ impl S3File {
 
         read_len
     }
+
+    // get the length when available, and otherwise compute it.
+    pub fn get_length(&mut self) -> IOResult<u64> {
+        let length = self.length.get_or_insert( //|| 
+            block_on(async {
+                s3_service::head_object(&self.client, &self.bucket, &self.object)
+                .await
+                .content_length() as usize}));
+        Ok(*length as u64)
+    }
 }
 
 impl Read for S3File {
@@ -155,6 +165,37 @@ impl Read for S3File {
     }
 }
 
+impl Seek for S3File {
+    fn seek(&mut self, pos: SeekFrom) -> IOResult<u64> {
+        let new_pos: i64 = match pos {
+            SeekFrom::Start(upos) =>  upos as i64,
+            SeekFrom::Current(ipos) =>   self.position as i64 + ipos,
+            // SeekFrom::End(ipos) -> {
+            //     match self.get_length() {
+            //         Ok(len) -> len as i64 + ipos,
+            //         Err(e) -> return Err(e)
+            //     }
+            SeekFrom::End(ipos) => self.get_length()? as i64 + ipos
+            }; 
+
+        // check the validity of the new position
+        if  new_pos < 0 {
+            return Err(IOError::new(IOErrorKind::InvalidInput, "Position should not before 0."));
+        } else if new_pos > self.get_length()? as i64 {
+            return Err(IOError::new(IOErrorKind::UnexpectedEof, "Position beyond size of S3-object."));
+        }
+
+        self.position = new_pos as usize;
+        Ok(self.position as u64)
+    }
+
+//    fn rewind(&mut self) -> Result<()> { ... }
+//    fn stream_len(&mut self) -> Result<u64> { ... }
+    
+    fn stream_position(&mut self) -> IOResult<u64> {
+        Ok(self.position as u64)
+    }
+}
 
 // temporarily included to test from MAIN
 //#[cfg(test)]
@@ -165,7 +206,7 @@ pub mod tests {
     //use aws_smithy_http::byte_stream::{ByteStream, AggregatedBytes};
     use uuid::Uuid;
     use futures::executor::block_on;
-    use std::io::Read;
+    use std::io::{Read, Seek, SeekFrom};
 
     use crate::s3_service;
     use crate::{S3File, REGION};
@@ -185,11 +226,13 @@ pub mod tests {
         (region, client, bucket_name, file_name, key, target_key)
     }
 
-    
+    const DEFAULT_BUCKET: &str = "doc-example-bucket-f895604e-164e-4587-9d6c-bc3b7da55fa2";
+    const DEFAULT_OBJECT: &str = "test file key name";
+
 
     pub fn test_read_S3File_aux(bucket_name: Option<&str>, object_name: &str) -> (Box<[u8]>, Box<[u8]>,Box<[u8]>) {
         // use a default bucket if none is specified
-        let bucket_name = bucket_name.unwrap_or(&"doc-example-bucket-f895604e-164e-4587-9d6c-bc3b7da55fa2");
+        let bucket_name = bucket_name.unwrap_or(&DEFAULT_BUCKET);
         // test 1
         let mut s3file_1 = S3File::new(bucket_name.to_owned(), object_name.to_string(), 10);
 
@@ -198,11 +241,11 @@ pub mod tests {
         let mut buff2: Box<[u8]> = vec![0;buff_len+7].into_boxed_slice();
         let mut buff3: Box<[u8]> = vec![0;buff_len].into_boxed_slice();
 
-        // move position to 20  (start of "Hello World")
+        // move position to 10  (start of "Hello World" is at 20)
         s3file_1.position = 10;
-        s3file_1.read(&mut buff1).expect("Failed to read S3-object (buff_1)");
-        s3file_1.read(&mut buff2).expect("Failed to read S3-object (buff_2)");
-        s3file_1.read(&mut buff3).expect("Failed to read S3-object (buff_3)");
+        s3file_1.read(&mut buff1).expect("Failed to read S3-object (buff_1)");  // read 10 bytes
+        s3file_1.read(&mut buff2).expect("Failed to read S3-object (buff_2)");  // read 17 bytes
+        s3file_1.read(&mut buff3).expect("Failed to read S3-object (buff_3)");  // read 10 bytes
 
         (buff1, buff2, buff3)
 
@@ -210,13 +253,33 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_read_S3File() {
-        let (b1, b2, b3) = test_read_S3File_aux(None, &"test file key name");
+        let (b1, b2, b3) = test_read_S3File_aux(None, &DEFAULT_OBJECT);
         println!("\tb1={:?}\n\tb2={:?}\n\tb3={:?}", b1, b2, b2);
         assert_eq!(b1.as_ref(), b"\nabcdefgh\n");
         assert_eq!(b2.as_ref(), b"Hello world!\n\nAnd");
         assert_eq!(b3.as_ref(), b" a whole l");
 
     }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_seek_S3File() {
+        let mut s3file_1 = S3File::new(DEFAULT_BUCKET.to_owned(), DEFAULT_OBJECT.to_owned(), 15);
+
+        let buff_len = 36;
+        let mut buff1: Box<[u8]> = vec![0;buff_len].into_boxed_slice();
+        let mut buff2: Box<[u8]> = vec![0;buff_len+7].into_boxed_slice();
+        let mut buff3: Box<[u8]> = vec![0;buff_len].into_boxed_slice();
+
+        // move position to 30  from the end and read 30
+        s3file_1.seek(SeekFrom::End(-1 * buff_len as i64));
+        s3file_1.read(&mut buff1).expect("Failed to read S3-object (buff_1)");  // read 10 bytes
+    
+//        println!("\tbuff1={:?}\n\tb2={:?}\n\tb3={:?}", b1, b2, b2);
+        println!("\n###################\n\tbuff1={:?}\n", buff1);
+        assert_eq!(buff1.as_ref(), b"Nunc nec tristique diam.\nTouch test.");
+
+    }
+
 
     // create a test-input file and run the test.
     pub async fn read_from_s3_aux(test_data: &[u8]) -> (Box<[u8]>, Box<[u8]>,Box<[u8]>) {

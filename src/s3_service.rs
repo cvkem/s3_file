@@ -8,7 +8,7 @@
 use aws_sdk_s3::model::{
     BucketLocationConstraint, CreateBucketConfiguration, Delete, ObjectIdentifier,
 };
-use aws_sdk_s3::output::{GetObjectOutput, ListObjectsV2Output};
+use aws_sdk_s3::output::{GetObjectOutput, HeadObjectOutput, ListObjectsV2Output};
 use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Client, Error};
 use std::path::Path;
@@ -103,6 +103,17 @@ pub async fn download_object(client: &Client, bucket_name: &str, key: &str, rang
 }
 // snippet-end:[rust.example_code.s3.basics.get_object]
 // snippet-end:[rust.example_code.s3.basics.download_object]
+
+// get the head of an objects. Mainly needed to compute the length of the S3-object
+pub async fn head_object(client: &Client, bucket_name: &str, key: &str) -> HeadObjectOutput {
+    let resp = client
+        .head_object()
+        .bucket(bucket_name)
+        .key(key)
+        .send()
+        .await;
+    resp.unwrap()
+}
 
 
 pub const UPLOAD_CONTENT: &[u8] = b"0123456789

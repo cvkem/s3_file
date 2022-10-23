@@ -35,13 +35,6 @@ async fn setup() -> (Region, Client, String, String, String, String) {
 }
 
 
-// async fn test_it_runs() {
-//     let (region, client, bucket_name, file_name, key, target_key) = setup().await;
-//     match run_s3_operations(region, client, bucket_name, file_name, key, target_key).await {
-//         Err(_e) => assert!(false),
-//         _ => assert!(true),
-//     }
-// }
 
 async fn run_s3_operations(
     region: Region,
@@ -101,12 +94,6 @@ async fn main() -> Result<(), Error> {
     println!("results are results.0={:?} and as string: {:?}", &results.2, str::from_utf8(&results.2));
     println!(" Read_from_s3_aux ready!!!\n");
 
-    // let (region, client, bucket_name, file_name, key, target_key) = setup().await;
-
-    // match run_s3_operations(region, client, bucket_name, file_name, key, target_key).await {
-    //     Ok(msgs) => println!("{}", msgs),
-    //     Err(msg) => panic!("{}", msg)
-    // }
     Ok(())
 }
 
