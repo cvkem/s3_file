@@ -14,6 +14,7 @@ use futures::executor::block_on;
 pub const REGION: &str = "eu-central-1";
 
 mod s3_service;
+mod lru_cache;
 
 struct ObjBlock {
     start: usize,
@@ -40,9 +41,8 @@ async fn get_client() -> Client {
 }
 
 impl S3File {
-
     
-    // create a new S3File with an LRU-cache to support fast (sequential) read operations
+    /// create a new S3File with an LRU-cache to support fast (sequential) read operations
     pub fn new(bucket: String, object: String, block_size: usize) -> Self {
         Self{client: block_on(get_client()), 
             bucket, 
@@ -53,70 +53,74 @@ impl S3File {
             cache: Vec::<ObjBlock>::with_capacity(10)}
     }
 
-    // free the Least Recent Used page to make more room in the cache
-    fn free_lru(&mut self) {
-        if self.cache.len() < 1 {
-            panic!("No block to free");
-        }
-        let mut oldest = Instant::now();
-        let mut oldest_idx = 0_usize;
+    // /// free the Least Recent Used page to make more room in the cache
+    // fn free_lru(&mut self) {
+    //     if self.cache.len() < 1 {
+    //         panic!("No block to free");
+    //     }
+    //     let mut oldest = Instant::now();
+    //     let mut oldest_idx = 0_usize;
 
-        for (idx, ob) in self.cache.iter().enumerate() {
-            if ob.last_used < oldest {
-                oldest = ob.last_used.clone();
-                oldest_idx = idx;
-            }
-        }
-        self.cache.remove(oldest_idx);
-    }
+    //     for (idx, ob) in self.cache.iter().enumerate() {
+    //         if ob.last_used < oldest {
+    //             oldest = ob.last_used.clone();
+    //             oldest_idx = idx;
+    //         }
+    //     }
+    //     self.cache.remove(oldest_idx);
+    // }
 
-    // append a block to the cache that contains the byte start and append it to the cache
-    fn get_block_from_store(&mut self, start: usize) -> usize {
-        let block_start = (start / self.block_size) * self.block_size;
-        //let end_block = cmp::min(block_start + self.block_size, self.get_length());
-        let block_end = block_start + self.block_size - 1;  // end is inclusive
+    // // append a block to the cache that contains the byte start and append it to the cache
+    // fn get_block_from_store(&mut self, start: usize) -> usize {
+    //     let block_start = (start / self.block_size) * self.block_size;
+    //     //let end_block = cmp::min(block_start + self.block_size, self.get_length());
+    //     let block_end = block_start + self.block_size - 1;  // end is inclusive
 
-        // create the block and fill it with data
-        let range = format!("bytes={block_start}-{block_end}");
-        println!("\nAbout to fetch object {}::{} for range='{}'", &self.bucket, &self.object, &range);
-        let f = async {
-            let get_obj_output = s3_service::download_object(&self.client, &self.bucket, &self.object, Some(range)).await;
-            println!("Received object {:?}", get_obj_output);
-            // set length when nog readily available, as we get this information free of charge here.
-            _ = self.length.get_or_insert(get_obj_output.content_length() as usize);
-            let agg_bytes = get_obj_output.body.collect().await.expect("Failed to read data");
-            println!("Received bytes {:?}", agg_bytes);
-            // turn into bytes and take a (ref-counted) full slice out of it (reuse of same buffer)
-            // Operating on AggregatedBytes directy would be more memory efficient (however, working with non-continguous memory in that case)
-            let data = agg_bytes.into_bytes();
-            let mut new_block = ObjBlock {
-                start: block_start,
-                last_used: Instant::now(),
-                data
-            };
-            self.cache.push(new_block);
-            println!("Pushed the block to the cache. Current length={}", self.cache.len());
-        };
-        block_on(f);
-        self.cache.len() - 1
-    }
+    //     // create the block and fill it with data
+    //     let range = format!("bytes={block_start}-{block_end}");
+    //     println!("\nAbout to fetch object {}::{} for range='{}'", &self.bucket, &self.object, &range);
+    //     let f = async {
 
-    // find the block in cache that contains 'start' and read from s3 if needed. Returns the index of the block in the 'cache'.
-    fn find_cached_block(&mut self, start: usize) -> usize {
-        for (idx, ob) in self.cache.iter().enumerate() {
-            if ob.start <= start && start < ob.start + ob.data.len() as usize {
-                return idx
-            } 
-        }
-        // block is not loaded yet
-        if self.cache.len() >= self.cache.capacity() {
-            self.free_lru();
-        };
+    //         // should be seperate function to read bytes for a cache-block
+    //         let get_obj_output = s3_service::download_object(&self.client, &self.bucket, &self.object, Some(range)).await;
+    //         println!("Received object {:?}", get_obj_output);
+    //         // set length of full object when not readily available, as we get this information free of charge here.
+    //         _ = self.length.get_or_insert(get_obj_output.content_length() as usize);
+    //         let agg_bytes = get_obj_output.body.collect().await.expect("Failed to read data");
+    //         println!("Received bytes {:?}", agg_bytes);
+    //         // turn into bytes and take a (ref-counted) full slice out of it (reuse of same buffer)
+    //         // Operating on AggregatedBytes directy would be more memory efficient (however, working with non-continguous memory in that case)
+    //         let data = agg_bytes.into_bytes();
 
-        self.get_block_from_store(start)
-    }
+            
+    //         let mut new_block = ObjBlock {
+    //             start: block_start,
+    //             last_used: Instant::now(),
+    //             data
+    //         };
+    //         self.cache.push(new_block);
+    //         println!("Pushed the block to the cache. Current length={}", self.cache.len());
+    //     };
+    //     block_on(f);
+    //     self.cache.len() - 1
+    // }
 
-    // get the filled cache-block and fill up the buffer over to at most 'max_len' bytes. Return the number of read bytes.
+    // /// find the block in cache that contains 'start' and read from s3 if needed. Returns the index of the block in the 'cache'.
+    // fn find_cached_block(&mut self, start: usize) -> usize {
+    //     for (idx, ob) in self.cache.iter().enumerate() {
+    //         if ob.start <= start && start < ob.start + ob.data.len() as usize {
+    //             return idx
+    //         } 
+    //     }
+    //     // block is not loaded yet
+    //     if self.cache.len() >= self.cache.capacity() {
+    //         self.free_lru();
+    //     };
+
+    //     self.get_block_from_store(start)
+    // }
+
+    /// get the filled cache-block and fill up the buffer over to at most 'max_len' bytes. Return the number of read bytes.
     fn read_segment(&mut self, buffer: &mut[u8], max_len: usize) -> usize {
         let block_idx = self.find_cached_block(self.position);
         let block = &self.cache[block_idx];
@@ -137,7 +141,7 @@ impl S3File {
         read_len
     }
 
-    // get the length when available, and otherwise compute it.
+    /// get the length when available, and otherwise compute it.
     pub fn get_length(&mut self) -> IOResult<u64> {
         let length = self.length.get_or_insert( //|| 
             block_on(async {
@@ -147,6 +151,24 @@ impl S3File {
         Ok(*length as u64)
     }
 }
+
+impl GetBytes for S3File {
+
+    fn get_bytes(block_start: usize, block_end: usize) -> Bytes {
+        let range = format!("bytes={block_start}-{block_end}");
+        // should be seperate function to read bytes for a cache-block
+        let get_obj_output = s3_service::download_object(&self.client, &self.bucket, &self.object, Some(range)).await;
+        println!("Received object {:?}", get_obj_output);
+        // set length of full object when not readily available, as we get this information free of charge here.
+        _ = self.length.get_or_insert(get_obj_output.content_length() as usize);
+        let agg_bytes = get_obj_output.body.collect().await.expect("Failed to read data");
+        println!("Received bytes {:?}", agg_bytes);
+        // turn into bytes and take a (ref-counted) full slice out of it (reuse of same buffer)
+        // Operating on AggregatedBytes directy would be more memory efficient (however, working with non-continguous memory in that case)
+        let data = agg_bytes.into_bytes();
+    }
+}
+
 
 impl Read for S3File {
     fn read(&mut self, buff: &mut [u8]) -> IOResult<usize> {
