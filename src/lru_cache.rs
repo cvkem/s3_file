@@ -1,5 +1,12 @@
 
+use std::time::Instant;
+use std::any::type_name;
+use std::ptr;
+use std::str;
+use std::cmp;
+use bytes::Bytes;
 
+use crate::source::GetBytes;
 
 
 struct ObjBlock {
@@ -9,21 +16,19 @@ struct ObjBlock {
 }
 
 
-trait GetBytes  {
-    fn get_bytes(start: usize, end: usize) -> Bytes;
-}
-
-pub struct LRU {
+pub struct LRU_cache<'a> {
     block_size: usize,
-    source: impl GetBytes;
+    source: &'a impl GetBytes;
     cache: Vec<ObjBlock>
 }
 
 
-impl LRU {
-    fn new(num_blocks: usize, block_size: usize, source: impl GetBytes) ->Self {
+impl LRU_cache {
+    fn new<'a>(num_blocks: usize, block_size: usize, source: &<'a> impl GetBytes) ->Self {
         let cache = Vec::with_capacity(num_blocks);
-        LRU {block_size, source, cache}
+        LRU_cache {block_size, 
+            source,
+            cache: Vec::<ObjBlock>::with_capacity(num_blocks)}
     }
 
     /// free the Least Recent Used page to make more room in the cache

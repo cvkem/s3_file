@@ -1,57 +1,45 @@
 
-use aws_sdk_s3::{Client, Error, Region,
-    types::ByteStream};
-use aws_config::meta::region::RegionProviderChain;
-use std::io::{Read, Result as IOResult, Seek, SeekFrom, Error as IOError, ErrorKind as IOErrorKind};
-use std::time::Instant;
-use std::any::type_name;
-use std::ptr;
-use std::str;
-use std::cmp;
-use bytes::Bytes;
-use futures::executor::block_on;
+// use aws_sdk_s3::{Client, Error, Region,
+//     types::ByteStream};
+// use aws_config::meta::region::RegionProviderChain;
+//use std::io::{Read, Result as IOResult, Seek, SeekFrom, Error as IOError, ErrorKind as IOErrorKind};
+// use std::time::Instant;
+// use std::any::type_name;
+// use std::ptr;
+// use std::str;
+// use std::cmp;
+// use bytes::Bytes;
+// use futures::executor::block_on;
 
-pub const REGION: &str = "eu-central-1";
+//pub const REGION: &str = "eu-central-1";
 
 mod s3_service;
 mod lru_cache;
+mod source;
+mod s3_file;
 
-struct ObjBlock {
-    start: usize,
-    last_used: Instant,
-    data: Bytes
-}
+// struct ObjBlock {
+//     start: usize,
+//     last_used: Instant,
+//     data: Bytes
+// }
 
-pub struct S3File {
-    client: Client,
-    pub bucket: String,
-    pub object: String,
-    position: usize,
-    block_size: usize,
-    length: Option<usize>,
-    cache: Vec<ObjBlock>
-}
+// pub struct S3File {
+//     lru_cache
+//     position: usize,
+// }
 
-async fn get_client() -> Client {
-    let region_provider = RegionProviderChain::first_try(Region::new(REGION));
-    let region = region_provider.region().await.unwrap();
 
-    let shared_config = aws_config::from_env().region(region_provider).load().await;
-    Client::new(&shared_config)
-}
-
-impl S3File {
+// impl S3File {
     
-    /// create a new S3File with an LRU-cache to support fast (sequential) read operations
-    pub fn new(bucket: String, object: String, block_size: usize) -> Self {
-        Self{client: block_on(get_client()), 
-            bucket, 
-            object, 
-            position: 0,
-            block_size,
-            length: None, 
-            cache: Vec::<ObjBlock>::with_capacity(10)}
-    }
+//     /// create a new S3File with an LRU-cache to support fast (sequential) read operations
+//     pub fn new(bucket: String, object: String, block_size: usize) -> Self {
+//         let source = new(bucket: String, object: String);
+
+//         Self{
+//             block_size, 
+//             cache: Vec::<ObjBlock>::with_capacity(10)}
+//     }
 
     // /// free the Least Recent Used page to make more room in the cache
     // fn free_lru(&mut self) {
@@ -120,104 +108,79 @@ impl S3File {
     //     self.get_block_from_store(start)
     // }
 
-    /// get the filled cache-block and fill up the buffer over to at most 'max_len' bytes. Return the number of read bytes.
-    fn read_segment(&mut self, buffer: &mut[u8], max_len: usize) -> usize {
-        let block_idx = self.find_cached_block(self.position);
-        let block = &self.cache[block_idx];
-        let relative_position = self.position - block.start;
-        let read_len = cmp::min(max_len, block.data.len() - relative_position);
+//     /// get the filled cache-block and fill up the buffer over to at most 'max_len' bytes. Return the number of read bytes.
+//     fn read_segment(&mut self, buffer: &mut[u8], max_len: usize) -> usize {
+//         let block_idx = self.find_cached_block(self.position);
+//         let block = &self.cache[block_idx];
+//         let relative_position = self.position - block.start;
+//         let read_len = cmp::min(max_len, block.data.len() - relative_position);
 
-        let src_slice = block.data.slice(relative_position..relative_position+read_len);
-        let dst_slice = &mut buffer[0..read_len];
-        dst_slice.copy_from_slice(&src_slice);
-        self.position += read_len;
-        // copy data
-        // let src_ptr = block.data.slice(relative_position..relative_position+read_len).as_ptr();
-        // let dst_ptr = buffer.as_mut_ptr();
-        // unsafe { ptr::copy_nonoverlapping(src_ptr, dst_ptr, read_len) };
-        // see example in: https://doc.rust-lang.org/std/ptr/fn.copy_nonoverlapping.html why next line is adviced
-        //dst_ptr.set_len(read_len);
+//         let src_slice = block.data.slice(relative_position..relative_position+read_len);
+//         let dst_slice = &mut buffer[0..read_len];
+//         dst_slice.copy_from_slice(&src_slice);
+//         self.position += read_len;
+//         // copy data
+//         // let src_ptr = block.data.slice(relative_position..relative_position+read_len).as_ptr();
+//         // let dst_ptr = buffer.as_mut_ptr();
+//         // unsafe { ptr::copy_nonoverlapping(src_ptr, dst_ptr, read_len) };
+//         // see example in: https://doc.rust-lang.org/std/ptr/fn.copy_nonoverlapping.html why next line is adviced
+//         //dst_ptr.set_len(read_len);
 
-        read_len
-    }
+//         read_len
+//     }
 
-    /// get the length when available, and otherwise compute it.
-    pub fn get_length(&mut self) -> IOResult<u64> {
-        let length = self.length.get_or_insert( //|| 
-            block_on(async {
-                s3_service::head_object(&self.client, &self.bucket, &self.object)
-                .await
-                .content_length() as usize}));
-        Ok(*length as u64)
-    }
-}
-
-impl GetBytes for S3File {
-
-    fn get_bytes(block_start: usize, block_end: usize) -> Bytes {
-        let range = format!("bytes={block_start}-{block_end}");
-        // should be seperate function to read bytes for a cache-block
-        let get_obj_output = s3_service::download_object(&self.client, &self.bucket, &self.object, Some(range)).await;
-        println!("Received object {:?}", get_obj_output);
-        // set length of full object when not readily available, as we get this information free of charge here.
-        _ = self.length.get_or_insert(get_obj_output.content_length() as usize);
-        let agg_bytes = get_obj_output.body.collect().await.expect("Failed to read data");
-        println!("Received bytes {:?}", agg_bytes);
-        // turn into bytes and take a (ref-counted) full slice out of it (reuse of same buffer)
-        // Operating on AggregatedBytes directy would be more memory efficient (however, working with non-continguous memory in that case)
-        let data = agg_bytes.into_bytes();
-    }
-}
+// }
 
 
-impl Read for S3File {
-    fn read(&mut self, buff: &mut [u8]) -> IOResult<usize> {
-        let buff_len = buff.len();
-        let mut read_len = 0;
-        let mut window: &mut  [u8] = buff;
-        while buff_len - read_len > 0 {
-            println!("Read segment after {} bytes to Window for at most {} bytes.", read_len, buff_len - read_len);
-            let len = self.read_segment(window, buff_len - read_len);
-            //shift the window forward (position has been updated already)
-            window = &mut window[len..];
-            read_len += len;
-        }
-        println!("Read buff '{}'.", str::from_utf8(&buff).unwrap());
-        Ok(read_len)
-    }
-}
 
-impl Seek for S3File {
-    fn seek(&mut self, pos: SeekFrom) -> IOResult<u64> {
-        let new_pos: i64 = match pos {
-            SeekFrom::Start(upos) =>  upos as i64,
-            SeekFrom::Current(ipos) =>   self.position as i64 + ipos,
-            // SeekFrom::End(ipos) -> {
-            //     match self.get_length() {
-            //         Ok(len) -> len as i64 + ipos,
-            //         Err(e) -> return Err(e)
-            //     }
-            SeekFrom::End(ipos) => self.get_length()? as i64 + ipos
-            }; 
+// impl Read for S3File {
+//     fn read(&mut self, buff: &mut [u8]) -> IOResult<usize> {
+//         let buff_len = buff.len();
+//         let mut read_len = 0;
+//         let mut window: &mut  [u8] = buff;
+//         while buff_len - read_len > 0 {
+//             println!("Read segment after {} bytes to Window for at most {} bytes.", read_len, buff_len - read_len);
+//             let len = self.read_segment(window, buff_len - read_len);
+//             //shift the window forward (position has been updated already)
+//             window = &mut window[len..];
+//             read_len += len;
+//         }
+//         println!("Read buff '{}'.", str::from_utf8(&buff).unwrap());
+//         Ok(read_len)
+//     }
+// }
 
-        // check the validity of the new position
-        if  new_pos < 0 {
-            return Err(IOError::new(IOErrorKind::InvalidInput, "Position should not before 0."));
-        } else if new_pos > self.get_length()? as i64 {
-            return Err(IOError::new(IOErrorKind::UnexpectedEof, "Position beyond size of S3-object."));
-        }
+// impl Seek for S3File {
+//     fn seek(&mut self, pos: SeekFrom) -> IOResult<u64> {
+//         let new_pos: i64 = match pos {
+//             SeekFrom::Start(upos) =>  upos as i64,
+//             SeekFrom::Current(ipos) =>   self.position as i64 + ipos,
+//             // SeekFrom::End(ipos) -> {
+//             //     match self.get_length() {
+//             //         Ok(len) -> len as i64 + ipos,
+//             //         Err(e) -> return Err(e)
+//             //     }
+//             SeekFrom::End(ipos) => self.get_length()? as i64 + ipos
+//             }; 
 
-        self.position = new_pos as usize;
-        Ok(self.position as u64)
-    }
+//         // check the validity of the new position
+//         if  new_pos < 0 {
+//             return Err(IOError::new(IOErrorKind::InvalidInput, "Position should not before 0."));
+//         } else if new_pos > self.get_length()? as i64 {
+//             return Err(IOError::new(IOErrorKind::UnexpectedEof, "Position beyond size of S3-object."));
+//         }
 
-//    fn rewind(&mut self) -> Result<()> { ... }
-//    fn stream_len(&mut self) -> Result<u64> { ... }
+//         self.position = new_pos as usize;
+//         Ok(self.position as u64)
+//     }
+
+// //    fn rewind(&mut self) -> Result<()> { ... }
+// //    fn stream_len(&mut self) -> Result<u64> { ... }
     
-    fn stream_position(&mut self) -> IOResult<u64> {
-        Ok(self.position as u64)
-    }
-}
+//     fn stream_position(&mut self) -> IOResult<u64> {
+//         Ok(self.position as u64)
+//     }
+// }
 
 // temporarily included to test from MAIN
 //#[cfg(test)]
