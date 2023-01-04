@@ -1,13 +1,10 @@
-use std::{
-    sync::Arc,
-    time::Instant};
+
+use std::time::Instant;
 use bytes::Bytes;
 use futures::executor::block_on;
 
 
-use crate::source::{
-    GetBytes,
-    ObjectSource};
+use crate::source::GetBytes;
 
 
 struct ObjBlock {
@@ -17,16 +14,16 @@ struct ObjBlock {
 }
 
 
-pub struct LruCache {
+pub struct LruCache<'a> {
     block_size: usize,
-    source: Arc<ObjectSource>,
+    source: &'a dyn GetBytes,
     pub cache: Vec<ObjBlock>  // should be private, but then find_cache_block should return a reference. TODO: fix this
 }
 
 
-impl<'a> LruCache {
+impl<'a> LruCache<'a> {
 
-    pub fn new(num_blocks: usize, block_size: usize, source: Arc<ObjectSource>) -> Self {
+    pub fn new(num_blocks: usize, block_size: usize, source: &'a impl GetBytes) -> Self {
         LruCache {block_size, 
             source,
             cache: Vec::<ObjBlock>::with_capacity(num_blocks)}

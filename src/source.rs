@@ -1,10 +1,8 @@
 
 use aws_sdk_s3::{Client, Region};
 use aws_config::meta::region::RegionProviderChain;
-use std::{
-    io::Result as IOResult,
-    str,
-    sync::Arc};
+use std::io::Result as IOResult;
+use std::str;
 use bytes::Bytes;
 use futures::executor::block_on;
 use async_trait::async_trait;
@@ -57,7 +55,7 @@ impl ObjectSource {
 }
 
 #[async_trait]
-impl GetBytes for Arc<ObjectSource> {
+impl GetBytes for ObjectSource {
 
     async fn get_bytes(&self, block_start: usize, block_end: usize) -> Bytes {
         let range = format!("bytes={block_start}-{block_end}");

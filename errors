@@ -1,3 +1,8 @@
+-----------------------
+Arc-error
+-----------------------
+
+
 error[E0596]: cannot borrow data in an `Arc` as mutable
   --> src/s3_file.rs:90:36
    |
@@ -16,7 +21,38 @@ error[E0596]: cannot borrow data in an `Arc` as mutable
 
 
 
+---------------------------
+Reference error
+---------------------------
 
 
+error[E0515]: cannot return value referencing local variable `source`
+  --> src/s3_file.rs:26:9
+   |
+24 |           let cache = LruCache::new(10, block_size, &source); 
+   |                                                     ------- `source` is borrowed here
+25 |
+26 | /         Self{
+27 | |             cache,
+28 | |             source,
+29 | |             position: 0
+30 | |         }
+   | |_________^ returns a value referencing data owned by the current function
 
+error[E0505]: cannot move out of `source` because it is borrowed
+  --> src/s3_file.rs:28:13
+   |
+22 |       pub fn new(bucket: String, object: String, block_size: usize) -> Self {
+   |                                                                        ---- return type is S3File<'1>
+23 |           let source = ObjectSource::new(bucket, object);
+24 |           let cache = LruCache::new(10, block_size, &source); 
+   |                                                     ------- borrow of `source` occurs here
+25 |
+26 | /         Self{
+27 | |             cache,
+28 | |             source,
+   | |             ^^^^^^ move out of `source` occurs here
+29 | |             position: 0
+30 | |         }
+   | |_________- returning this value requires that `source` is borrowed for `'1`
 

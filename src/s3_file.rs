@@ -1,13 +1,7 @@
-use std::{
-    cmp,
-    io::{
-        Read, 
-        Result as IOResult, 
-        Seek, SeekFrom, 
-        Error as IOError, 
-        ErrorKind as IOErrorKind},
-    str,
-    sync::Arc};
+use std::io::{Read, Result as IOResult, Seek, SeekFrom, Error as IOError, ErrorKind as IOErrorKind};
+// use std::ptr;
+use std::str;
+use std::cmp;
 
 
 use crate::lru_cache::LruCache;
@@ -15,19 +9,19 @@ use crate::source::ObjectSource;
 
 
 
-pub struct S3File {
-    cache: LruCache,
-    source: Arc<ObjectSource>,
+pub struct S3File<'a> {
+    cache: LruCache<'a>,
+    source: ObjectSource,
     position: usize
 }
 
 
-impl S3File {
+impl S3File<'_> {
     
     /// create a new S3File with an LRU-cache to support fast (sequential) read operations
     pub fn new(bucket: String, object: String, block_size: usize) -> Self {
-        let source = Arc::new(ObjectSource::new(bucket, object));
-        let cache = LruCache::new(10, block_size, Arc::clone(&source)); 
+        let source = ObjectSource::new(bucket, object);
+        let cache = LruCache::new(10, block_size, &source); 
 
         Self{
             cache,
@@ -60,7 +54,7 @@ impl S3File {
 }
 
 
-impl Read for S3File {
+impl Read for S3File<'_> {
     fn read(&mut self, buff: &mut [u8]) -> IOResult<usize> {
         let buff_len = buff.len();
         let mut read_len = 0;
@@ -77,7 +71,7 @@ impl Read for S3File {
     }
 }
 
-impl Seek for S3File {
+impl Seek for S3File<'_> {
     fn seek(&mut self, pos: SeekFrom) -> IOResult<u64> {
         let new_pos: i64 = match pos {
             SeekFrom::Start(upos) =>  upos as i64,
