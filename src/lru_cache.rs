@@ -1,32 +1,33 @@
-
-use std::time::Instant;
-use std::any::type_name;
-use std::ptr;
-use std::str;
-use std::cmp;
+use std::{
+    sync::Arc,
+    time::Instant};
 use bytes::Bytes;
+use futures::executor::block_on;
 
-use crate::source::GetBytes;
+
+use crate::source::{
+    GetBytes,
+    ObjectSource};
 
 
 struct ObjBlock {
-    start: usize,
+    pub start: usize,
     last_used: Instant,
-    data: Bytes
+    pub data: Bytes
 }
 
 
-pub struct LRU_cache<'a> {
+pub struct LruCache {
     block_size: usize,
-    source: &'a impl GetBytes;
-    cache: Vec<ObjBlock>
+    source: Arc<ObjectSource>,
+    pub cache: Vec<ObjBlock>  // should be private, but then find_cache_block should return a reference. TODO: fix this
 }
 
 
-impl LRU_cache {
-    fn new<'a>(num_blocks: usize, block_size: usize, source: &<'a> impl GetBytes) ->Self {
-        let cache = Vec::with_capacity(num_blocks);
-        LRU_cache {block_size, 
+impl<'a> LruCache {
+
+    pub fn new(num_blocks: usize, block_size: usize, source: Arc<ObjectSource>) -> Self {
+        LruCache {block_size, 
             source,
             cache: Vec::<ObjBlock>::with_capacity(num_blocks)}
     }
@@ -47,32 +48,32 @@ impl LRU_cache {
         }
         self.cache.remove(oldest_idx);
     }
-     // append a block to the cache that contains the byte start and append it to the cache
-     fn get_block_from_store(&mut self, start: usize) -> usize {
+
+    /// get a block from object-storage that contains byte-position 'start' and append it to the cache.
+    /// return the index of the block.
+    fn get_block_from_store(&mut self, start: usize) -> usize {
         let block_start = (start / self.block_size) * self.block_size;
         //let end_block = cmp::min(block_start + self.block_size, self.get_length());
         let block_end = block_start + self.block_size - 1;  // end is inclusive
 
         // create the block and fill it with data
-        println!("\nAbout to fetch object {}::{} for range='{}'", &self.bucket, &self.object, &range);
         let f = async {
 
-            let data = source.get_bytes(block_start, block_end);
+            let data = self.source.get_bytes(block_start, block_end).await;
             
-            let mut new_block = ObjBlock {
+            let new_block = ObjBlock {
                 start: block_start,
                 last_used: Instant::now(),
                 data
             };
             self.cache.push(new_block);
-            println!("Pushed the block to the cache. Current length={}", self.cache.len());
         };
         block_on(f);
         self.cache.len() - 1
     }
 
-       /// find the block in cache that contains 'start' and read from s3 if needed. Returns the index of the block in the 'cache'.
-       fn find_cached_block(&mut self, start: usize) -> usize {
+     /// find the block in cache that contains byte-position 'start' of the full object and read from s3 if needed. Returns the index of the block in the 'cache'.
+     pub fn find_cached_block(&mut self, start: usize) -> usize {
         for (idx, ob) in self.cache.iter().enumerate() {
             if ob.start <= start && start < ob.start + ob.data.len() as usize {
                 return idx

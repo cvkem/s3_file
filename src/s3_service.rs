@@ -11,7 +11,6 @@ use aws_sdk_s3::model::{
 use aws_sdk_s3::output::{GetObjectOutput, HeadObjectOutput, ListObjectsV2Output};
 use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Client, Error};
-use std::path::Path;
 use std::str;
 
 // snippet-start:[rust.example_code.s3.basics.delete_bucket]

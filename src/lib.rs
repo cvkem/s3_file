@@ -182,19 +182,22 @@ mod s3_file;
 //     }
 // }
 
-// temporarily included to test from MAIN
-//#[cfg(test)]
+#[cfg(test)]
 pub mod tests {
 
     use aws_config::meta::region::RegionProviderChain;
-    use aws_sdk_s3::{Client, Error, Region};
+    use aws_sdk_s3::{Client, 
+        //Error, 
+        Region};
     //use aws_smithy_http::byte_stream::{ByteStream, AggregatedBytes};
     use uuid::Uuid;
-    use futures::executor::block_on;
+ //   use futures::executor::block_on;
     use std::io::{Read, Seek, SeekFrom};
 
-    use crate::s3_service;
-    use crate::{S3File, REGION};
+    use crate::{
+        s3_service,
+        s3_file::S3File, 
+        source::REGION};
     
     async fn setup() -> (Region, Client, String, String, String, String) {
         let region_provider = RegionProviderChain::first_try(Region::new(REGION));

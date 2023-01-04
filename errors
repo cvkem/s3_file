@@ -1,0 +1,22 @@
+error[E0596]: cannot borrow data in an `Arc` as mutable
+  --> src/s3_file.rs:90:36
+   |
+90 |             SeekFrom::End(ipos) => self.source.get_length()? as i64 + ipos
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^^^ cannot borrow as mutable
+   |
+   = help: trait `DerefMut` is required to modify through a dereference, but it is not implemented for `Arc<ObjectSource>`
+
+error[E0596]: cannot borrow data in an `Arc` as mutable
+  --> src/s3_file.rs:96:29
+   |
+96 |         } else if new_pos > self.source.get_length()? as i64 {
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^ cannot borrow as mutable
+   |
+   = help: trait `DerefMut` is required to modify through a dereference, but it is not implemented for `Arc<ObjectSource>`
+
+
+
+
+
+
+

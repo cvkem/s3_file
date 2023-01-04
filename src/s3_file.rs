@@ -1,11 +1,23 @@
-use std::io::{Read, Result as IOResult, Seek, SeekFrom, Error as IOError, ErrorKind as IOErrorKind};
-use crate::lru_cache::LRU_cache;
+use std::{
+    cmp,
+    io::{
+        Read, 
+        Result as IOResult, 
+        Seek, SeekFrom, 
+        Error as IOError, 
+        ErrorKind as IOErrorKind},
+    str,
+    sync::Arc};
+
+
+use crate::lru_cache::LruCache;
 use crate::source::ObjectSource;
 
 
 
 pub struct S3File {
-    lru_cache: LRU_cache,
+    cache: LruCache,
+    source: Arc<ObjectSource>,
     position: usize
 }
 
@@ -14,11 +26,11 @@ impl S3File {
     
     /// create a new S3File with an LRU-cache to support fast (sequential) read operations
     pub fn new(bucket: String, object: String, block_size: usize) -> Self {
-        let source = ObjectSource::new(bucket: String, object: String);
-        let lru_cache = LRU_cache::new(10, block_size, &source); 
+        let source = Arc::new(ObjectSource::new(bucket, object));
+        let cache = LruCache::new(10, block_size, Arc::clone(&source)); 
 
         Self{
-            lru_cache,
+            cache,
             source,
             position: 0
         }
@@ -26,8 +38,8 @@ impl S3File {
 
     /// get the filled cache-block and fill up the buffer over to at most 'max_len' bytes. Return the number of read bytes.
     fn read_segment(&mut self, buffer: &mut[u8], max_len: usize) -> usize {
-        let block_idx = self.find_cached_block(self.position);
-        let block = &self.cache[block_idx];
+        let block_idx = self.cache.find_cached_block(self.position);
+        let block = &self.cache.cache[block_idx];
         let relative_position = self.position - block.start;
         let read_len = cmp::min(max_len, block.data.len() - relative_position);
 
@@ -75,13 +87,13 @@ impl Seek for S3File {
             //         Ok(len) -> len as i64 + ipos,
             //         Err(e) -> return Err(e)
             //     }
-            SeekFrom::End(ipos) => self.get_length()? as i64 + ipos
+            SeekFrom::End(ipos) => self.source.get_length()? as i64 + ipos
             }; 
 
         // check the validity of the new position
         if  new_pos < 0 {
             return Err(IOError::new(IOErrorKind::InvalidInput, "Position should not before 0."));
-        } else if new_pos > self.get_length()? as i64 {
+        } else if new_pos > self.source.get_length()? as i64 {
             return Err(IOError::new(IOErrorKind::UnexpectedEof, "Position beyond size of S3-object."));
         }
 
