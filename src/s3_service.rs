@@ -114,7 +114,7 @@ pub async fn head_object(client: &Client, bucket_name: &str, key: &str) -> HeadO
     resp.unwrap()
 }
 
-
+// TODO: remove: not used anymore
 pub const UPLOAD_CONTENT: &[u8] = b"0123456789
 abcdefgh
 Hello world!
@@ -129,7 +129,6 @@ Donec mollis finibus metus in cursus. In blandit ornare purus. Vestibulum a ipsu
 Touch test.";
 
 
-
 // snippet-start:[rust.example_code.s3.basics.upload_object]
 // snippet-start:[rust.example_code.s3.basics.put_object]
 pub async fn upload_object(
@@ -139,8 +138,8 @@ pub async fn upload_object(
     key: &str,
     body: &[u8]
 ) -> Result<(), Error> {
-//    let body = ByteStream::from_path(Path::new(file_name)).await;
-    let body = ByteStream::from_static(UPLOAD_CONTENT);
+//    let body = ByteStream::from_static(UPLOAD_CONTENT);
+    let body = ByteStream::from(Vec::from(body));
     client
         .put_object()
         .bucket(bucket_name)

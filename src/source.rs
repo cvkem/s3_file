@@ -22,7 +22,7 @@ pub trait GetBytes  {
 
 async fn get_client() -> Client {
     let region_provider = RegionProviderChain::first_try(Region::new(REGION));
-    let region = region_provider.region().await.unwrap();
+    //let region = region_provider.region().await.unwrap();
 
     let shared_config = aws_config::from_env().region(region_provider).load().await;
     Client::new(&shared_config)
