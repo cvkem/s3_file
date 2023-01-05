@@ -4,7 +4,9 @@ use aws_config::meta::region::RegionProviderChain;
 use std::{
     io::Result as IOResult,
     str,
-    sync::Arc};
+    sync::{
+        //Arc, Mutex, 
+        MutexGuard}};
 use bytes::Bytes;
 use futures::executor::block_on;
 use async_trait::async_trait;
@@ -57,7 +59,7 @@ impl ObjectSource {
 }
 
 #[async_trait]
-impl GetBytes for Arc<ObjectSource> {
+impl GetBytes for MutexGuard<'_, ObjectSource> {
 
     async fn get_bytes(&self, block_start: usize, block_end: usize) -> Bytes {
         let range = format!("bytes={block_start}-{block_end}");

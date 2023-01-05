@@ -1,5 +1,5 @@
 use std::{
-    sync::Arc,
+    sync::{Arc, Mutex},
     time::Instant};
 use bytes::Bytes;
 use futures::executor::block_on;
@@ -10,7 +10,7 @@ use crate::source::{
     ObjectSource};
 
 
-struct ObjBlock {
+pub struct ObjBlock {
     pub start: usize,
     last_used: Instant,
     pub data: Bytes
@@ -19,14 +19,14 @@ struct ObjBlock {
 
 pub struct LruCache {
     block_size: usize,
-    source: Arc<ObjectSource>,
+    source: Arc<Mutex<ObjectSource>>,
     pub cache: Vec<ObjBlock>  // should be private, but then find_cache_block should return a reference. TODO: fix this
 }
 
 
 impl LruCache {
 
-    pub fn new(num_blocks: usize, block_size: usize, source: Arc<ObjectSource>) -> Self {
+    pub fn new(num_blocks: usize, block_size: usize, source: Arc<Mutex<ObjectSource>>) -> Self {
         LruCache {block_size, 
             source,
             cache: Vec::<ObjBlock>::with_capacity(num_blocks)}
@@ -59,7 +59,7 @@ impl LruCache {
         // create the block and fill it with data
         let f = async {
 
-            let data = self.source.get_bytes(block_start, block_end).await;
+            let data = self.source.lock().unwrap().get_bytes(block_start, block_end).await;
             
             let new_block = ObjBlock {
                 start: block_start,

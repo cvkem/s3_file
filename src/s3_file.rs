@@ -7,7 +7,7 @@ use std::{
         Error as IOError, 
         ErrorKind as IOErrorKind},
     str,
-    sync::Arc};
+    sync::{Arc, Mutex}};
 
 
 use crate::lru_cache::LruCache;
@@ -17,7 +17,7 @@ use crate::source::ObjectSource;
 
 pub struct S3File {
     cache: LruCache,
-    source: Arc<ObjectSource>,
+    source: Arc<Mutex<ObjectSource>>,
     position: usize
 }
 
@@ -26,7 +26,7 @@ impl S3File {
     
     /// create a new S3File with an LRU-cache to support fast (sequential) read operations
     pub fn new(bucket: String, object: String, block_size: usize) -> Self {
-        let source = Arc::new(ObjectSource::new(bucket, object));
+        let source = Arc::new(Mutex::new(ObjectSource::new(bucket, object)));
         let cache = LruCache::new(10, block_size, Arc::clone(&source)); 
 
         Self{
@@ -87,13 +87,13 @@ impl Seek for S3File {
             //         Ok(len) -> len as i64 + ipos,
             //         Err(e) -> return Err(e)
             //     }
-            SeekFrom::End(ipos) => self.source.get_length()? as i64 + ipos
+            SeekFrom::End(ipos) => self.source.lock().unwrap().get_length()? as i64 + ipos
             }; 
 
         // check the validity of the new position
         if  new_pos < 0 {
             return Err(IOError::new(IOErrorKind::InvalidInput, "Position should not before 0."));
-        } else if new_pos > self.source.get_length()? as i64 {
+        } else if new_pos > self.source.lock().unwrap().get_length()? as i64 {
             return Err(IOError::new(IOErrorKind::UnexpectedEof, "Position beyond size of S3-object."));
         }
 

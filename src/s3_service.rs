@@ -5,6 +5,7 @@
 
 // snippet-start:[rust.example_code.s3.scenario_getting_started.lib]
 
+
 use aws_sdk_s3::model::{
     BucketLocationConstraint, CreateBucketConfiguration, Delete, ObjectIdentifier,
 };
@@ -13,6 +14,7 @@ use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Client, Error};
 use std::str;
 
+#[allow(dead_code)]
 // snippet-start:[rust.example_code.s3.basics.delete_bucket]
 pub async fn delete_bucket(client: &Client, bucket_name: &str) -> Result<(), Error> {
     client.delete_bucket().bucket(bucket_name).send().await?;
@@ -21,6 +23,7 @@ pub async fn delete_bucket(client: &Client, bucket_name: &str) -> Result<(), Err
 }
 // snippet-end:[rust.example_code.s3.basics.delete_bucket]
 
+#[allow(dead_code)]
 // snippet-start:[rust.example_code.s3.basics.delete_objects]
 pub async fn delete_objects(client: &Client, bucket_name: &str) -> Result<(), Error> {
     let objects = client.list_objects_v2().bucket(bucket_name).send().await?;
@@ -49,6 +52,8 @@ pub async fn delete_objects(client: &Client, bucket_name: &str) -> Result<(), Er
 }
 // snippet-end:[rust.example_code.s3.basics.delete_objects]
 
+
+#[allow(dead_code)]
 // snippet-start:[rust.example_code.s3.basics.list_objects]
 pub async fn list_objects(client: &Client, bucket_name: &str) -> Result<(), Error> {
     let objects = client.list_objects_v2().bucket(bucket_name).send().await?;
@@ -61,6 +66,8 @@ pub async fn list_objects(client: &Client, bucket_name: &str) -> Result<(), Erro
 }
 // snippet-end:[rust.example_code.s3.basics.list_objects]
 
+
+#[allow(dead_code)]
 // snippet-start:[rust.example_code.s3.basics.copy_object]
 pub async fn copy_object(
     client: &Client,
@@ -85,6 +92,8 @@ pub async fn copy_object(
 }
 // snippet-end:[rust.example_code.s3.basics.copy_object]
 
+
+#[allow(dead_code)]
 // snippet-start:[rust.example_code.s3.basics.download_object]
 // snippet-start:[rust.example_code.s3.basics.get_object]
 pub async fn download_object(client: &Client, bucket_name: &str, key: &str, range: Option<String>) -> GetObjectOutput {
@@ -103,6 +112,8 @@ pub async fn download_object(client: &Client, bucket_name: &str, key: &str, rang
 // snippet-end:[rust.example_code.s3.basics.get_object]
 // snippet-end:[rust.example_code.s3.basics.download_object]
 
+
+#[allow(dead_code)]
 // get the head of an objects. Mainly needed to compute the length of the S3-object
 pub async fn head_object(client: &Client, bucket_name: &str, key: &str) -> HeadObjectOutput {
     let resp = client
@@ -114,6 +125,7 @@ pub async fn head_object(client: &Client, bucket_name: &str, key: &str) -> HeadO
     resp.unwrap()
 }
 
+#[allow(dead_code)]
 // TODO: remove: not used anymore
 pub const UPLOAD_CONTENT: &[u8] = b"0123456789
 abcdefgh
@@ -128,7 +140,7 @@ Donec in accumsan odio. Integer faucibus velit posuere sem commodo tincidunt. Fu
 Donec mollis finibus metus in cursus. In blandit ornare purus. Vestibulum a ipsum diam. Curabitur vel iaculis diam, id egestas ligula. Morbi condimentum imperdiet tellus. Aenean ut ligula nulla. Nam quis auctor odio. Sed eget blandit magna, sit amet consectetur ex. Quisque fermentum nunc at nisi dictum molestie. Ut tempus fermentum ipsum, vel aliquet sem rutrum quis. Nunc nec tristique diam.
 Touch test.";
 
-
+#[allow(dead_code)]
 // snippet-start:[rust.example_code.s3.basics.upload_object]
 // snippet-start:[rust.example_code.s3.basics.put_object]
 pub async fn upload_object(
@@ -155,6 +167,7 @@ pub async fn upload_object(
 // snippet-end:[rust.example_code.s3.basics.put_object]
 // snippet-end:[rust.example_code.s3.basics.upload_object]
 
+#[allow(dead_code)]
 // snippet-start:[rust.example_code.s3.basics.create_bucket]
 pub async fn create_bucket(client: &Client, bucket_name: &str, region: &str) -> Result<(), Error> {
     let constraint = BucketLocationConstraint::from(region);

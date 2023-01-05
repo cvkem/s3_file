@@ -73,29 +73,29 @@ async fn run_s3_operations(
 }
 
 // TMP:  remove/comment the feature-flag #[cfg(test)]  in file lib.rs
-use S3_file::tests;
+// use S3_file::tests;
 
-// normal main used for console operation
-#[tokio::main]
-async fn main() -> Result<(), Error> {
-    // tracing_subscriber::fmt()
-    //     .with_max_level(tracing::Level::INFO)
-    //     // disable printing the name of the module in every log line.
-    //     .with_target(false)
-    //     // disabling time is handy because CloudWatch will add the ingestion time.
-    //     .without_time()
-    //     .init();
+// // normal main used for console operation
+// #[tokio::main]
+// async fn main() -> Result<(), Error> {
+//     // tracing_subscriber::fmt()
+//     //     .with_max_level(tracing::Level::INFO)
+//     //     // disable printing the name of the module in every log line.
+//     //     .with_target(false)
+//     //     // disabling time is handy because CloudWatch will add the ingestion time.
+//     //     .without_time()
+//     //     .init();
 
-    // run tests from main
-    println!("About to enter async function.");
-    let results = tests::read_from_s3_aux(s3_service::UPLOAD_CONTENT).await;
-    println!("\n----------------\nresults are results.0={:?} and as string: {:?}", &results.0, str::from_utf8(&results.0));
-    println!("results are results.0={:?} and as string: {:?}", &results.1, str::from_utf8(&results.1));
-    println!("results are results.0={:?} and as string: {:?}", &results.2, str::from_utf8(&results.2));
-    println!(" Read_from_s3_aux ready!!!\n");
+//     // run tests from main
+//     println!("About to enter async function.");
+//     let results = tests::read_from_s3_aux(s3_service::UPLOAD_CONTENT).await;
+//     println!("\n----------------\nresults are results.0={:?} and as string: {:?}", &results.0, str::from_utf8(&results.0));
+//     println!("results are results.0={:?} and as string: {:?}", &results.1, str::from_utf8(&results.1));
+//     println!("results are results.0={:?} and as string: {:?}", &results.2, str::from_utf8(&results.2));
+//     println!(" Read_from_s3_aux ready!!!\n");
 
-    Ok(())
-}
+//     Ok(())
+// }
 
 
 
@@ -142,16 +142,16 @@ async fn function_handler(event: LambdaEvent<Request>) -> Result<Response, LmdEr
     Ok(resp)
 }
 
-// Lambda-main
-// #[tokio::main]
-// async fn main() -> Result<(), LmdError> {
-//     tracing_subscriber::fmt()
-//         .with_max_level(tracing::Level::INFO)
-//         // disable printing the name of the module in every log line.
-//         .with_target(false)
-//         // disabling time is handy because CloudWatch will add the ingestion time.
-//         .without_time()
-//         .init();
+//Lambda-main
+#[tokio::main]
+async fn main() -> Result<(), LmdError> {
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        // disable printing the name of the module in every log line.
+        .with_target(false)
+        // disabling time is handy because CloudWatch will add the ingestion time.
+        .without_time()
+        .init();
 
-//     run(service_fn(function_handler)).await
-// }
+    run(service_fn(function_handler)).await
+}
