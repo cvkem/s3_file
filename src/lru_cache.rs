@@ -24,7 +24,7 @@ pub struct LruCache {
 }
 
 
-impl<'a> LruCache {
+impl LruCache {
 
     pub fn new(num_blocks: usize, block_size: usize, source: Arc<ObjectSource>) -> Self {
         LruCache {block_size, 
