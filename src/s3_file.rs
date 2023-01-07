@@ -18,7 +18,7 @@ use crate::source::ObjectSource;
 pub struct S3File {
     cache: LruCache,
     source: Arc<Mutex<ObjectSource>>,
-    position: usize
+    pub position: usize
 }
 
 

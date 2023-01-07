@@ -14,6 +14,8 @@ use aws_sdk_s3::types::ByteStream;
 use aws_sdk_s3::{Client, Error};
 use std::str;
 
+
+
 #[allow(dead_code)]
 // snippet-start:[rust.example_code.s3.basics.delete_bucket]
 pub async fn delete_bucket(client: &Client, bucket_name: &str) -> Result<(), Error> {
@@ -25,7 +27,7 @@ pub async fn delete_bucket(client: &Client, bucket_name: &str) -> Result<(), Err
 
 #[allow(dead_code)]
 // snippet-start:[rust.example_code.s3.basics.delete_objects]
-pub async fn delete_objects(client: &Client, bucket_name: &str) -> Result<(), Error> {
+pub async fn delete_objects(client: &Client, bucket_name: &str) -> Result<usize, Error> {
     let objects = client.list_objects_v2().bucket(bucket_name).send().await?;
 
     let mut delete_objects: Vec<ObjectIdentifier> = vec![];
@@ -35,6 +37,9 @@ pub async fn delete_objects(client: &Client, bucket_name: &str) -> Result<(), Er
             .build();
         delete_objects.push(obj_id);
     }
+
+    let num_obj = delete_objects.len();
+
     client
         .delete_objects()
         .bucket(bucket_name)
@@ -44,7 +49,7 @@ pub async fn delete_objects(client: &Client, bucket_name: &str) -> Result<(), Er
 
     let objects: ListObjectsV2Output = client.list_objects_v2().bucket(bucket_name).send().await?;
     match objects.key_count {
-        0 => Ok(()),
+        0 => Ok(num_obj),
         _ => Err(Error::Unhandled(Box::from(
             "There were still objects left in the bucket.",
         ))),
@@ -65,6 +70,33 @@ pub async fn list_objects(client: &Client, bucket_name: &str) -> Result<(), Erro
     Ok(())
 }
 // snippet-end:[rust.example_code.s3.basics.list_objects]
+
+
+pub async fn delete_buckets_with_prefix(client: &Client, bucket_prefix: &str) -> Result<(), Error> {
+    let buckets = client.list_buckets().send().await?;
+
+    for bucket in buckets.buckets().unwrap_or_default() {
+        println!("bucket-info: {:?}", bucket);
+
+        let bucket_name = bucket.name().unwrap();
+        if bucket_name.starts_with(bucket_prefix) {
+            match delete_objects(client, bucket_name).await {
+                Ok(num_obj) => println!("Deleted {num_obj} objects from bucket {bucket_name}"),
+                Err(err) => println!("Deleting bucket-contents of {bucket_name} resturned {err:?}")
+            };
+
+            match delete_bucket(client, bucket_name).await {
+                Ok(_) => println!("Deleted bucket {bucket_name}"),
+                Err(err) => println!("Deletion of bucket {bucket_name} failed with error {err:?}")
+            };
+
+        } else {
+            println!("Bucket with name {bucket_name} does not have the expected prefix.");
+        }
+    };
+
+    Ok(())
+}
 
 
 #[allow(dead_code)]

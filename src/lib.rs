@@ -1,194 +1,20 @@
+pub use client::{get_client, get_region_client};
+pub use s3_service::delete_buckets_with_prefix;
+pub use s3_file::S3File;
 
-// use aws_sdk_s3::{Client, Error, Region,
-//     types::ByteStream};
-// use aws_config::meta::region::RegionProviderChain;
-//use std::io::{Read, Result as IOResult, Seek, SeekFrom, Error as IOError, ErrorKind as IOErrorKind};
-// use std::time::Instant;
-// use std::any::type_name;
-// use std::ptr;
-// use std::str;
-// use std::cmp;
-// use bytes::Bytes;
-// use futures::executor::block_on;
-
-//pub const REGION: &str = "eu-central-1";
-
-mod s3_service;
+mod client;
+pub mod s3_service;
 mod lru_cache;
 mod source;
 mod s3_file;
 
-// struct ObjBlock {
-//     start: usize,
-//     last_used: Instant,
-//     data: Bytes
-// }
 
-// pub struct S3File {
-//     lru_cache
-//     position: usize,
-// }
-
-
-// impl S3File {
-    
-//     /// create a new S3File with an LRU-cache to support fast (sequential) read operations
-//     pub fn new(bucket: String, object: String, block_size: usize) -> Self {
-//         let source = new(bucket: String, object: String);
-
-//         Self{
-//             block_size, 
-//             cache: Vec::<ObjBlock>::with_capacity(10)}
-//     }
-
-    // /// free the Least Recent Used page to make more room in the cache
-    // fn free_lru(&mut self) {
-    //     if self.cache.len() < 1 {
-    //         panic!("No block to free");
-    //     }
-    //     let mut oldest = Instant::now();
-    //     let mut oldest_idx = 0_usize;
-
-    //     for (idx, ob) in self.cache.iter().enumerate() {
-    //         if ob.last_used < oldest {
-    //             oldest = ob.last_used.clone();
-    //             oldest_idx = idx;
-    //         }
-    //     }
-    //     self.cache.remove(oldest_idx);
-    // }
-
-    // // append a block to the cache that contains the byte start and append it to the cache
-    // fn get_block_from_store(&mut self, start: usize) -> usize {
-    //     let block_start = (start / self.block_size) * self.block_size;
-    //     //let end_block = cmp::min(block_start + self.block_size, self.get_length());
-    //     let block_end = block_start + self.block_size - 1;  // end is inclusive
-
-    //     // create the block and fill it with data
-    //     let range = format!("bytes={block_start}-{block_end}");
-    //     println!("\nAbout to fetch object {}::{} for range='{}'", &self.bucket, &self.object, &range);
-    //     let f = async {
-
-    //         // should be seperate function to read bytes for a cache-block
-    //         let get_obj_output = s3_service::download_object(&self.client, &self.bucket, &self.object, Some(range)).await;
-    //         println!("Received object {:?}", get_obj_output);
-    //         // set length of full object when not readily available, as we get this information free of charge here.
-    //         _ = self.length.get_or_insert(get_obj_output.content_length() as usize);
-    //         let agg_bytes = get_obj_output.body.collect().await.expect("Failed to read data");
-    //         println!("Received bytes {:?}", agg_bytes);
-    //         // turn into bytes and take a (ref-counted) full slice out of it (reuse of same buffer)
-    //         // Operating on AggregatedBytes directy would be more memory efficient (however, working with non-continguous memory in that case)
-    //         let data = agg_bytes.into_bytes();
-
-            
-    //         let mut new_block = ObjBlock {
-    //             start: block_start,
-    //             last_used: Instant::now(),
-    //             data
-    //         };
-    //         self.cache.push(new_block);
-    //         println!("Pushed the block to the cache. Current length={}", self.cache.len());
-    //     };
-    //     block_on(f);
-    //     self.cache.len() - 1
-    // }
-
-    // /// find the block in cache that contains 'start' and read from s3 if needed. Returns the index of the block in the 'cache'.
-    // fn find_cached_block(&mut self, start: usize) -> usize {
-    //     for (idx, ob) in self.cache.iter().enumerate() {
-    //         if ob.start <= start && start < ob.start + ob.data.len() as usize {
-    //             return idx
-    //         } 
-    //     }
-    //     // block is not loaded yet
-    //     if self.cache.len() >= self.cache.capacity() {
-    //         self.free_lru();
-    //     };
-
-    //     self.get_block_from_store(start)
-    // }
-
-//     /// get the filled cache-block and fill up the buffer over to at most 'max_len' bytes. Return the number of read bytes.
-//     fn read_segment(&mut self, buffer: &mut[u8], max_len: usize) -> usize {
-//         let block_idx = self.find_cached_block(self.position);
-//         let block = &self.cache[block_idx];
-//         let relative_position = self.position - block.start;
-//         let read_len = cmp::min(max_len, block.data.len() - relative_position);
-
-//         let src_slice = block.data.slice(relative_position..relative_position+read_len);
-//         let dst_slice = &mut buffer[0..read_len];
-//         dst_slice.copy_from_slice(&src_slice);
-//         self.position += read_len;
-//         // copy data
-//         // let src_ptr = block.data.slice(relative_position..relative_position+read_len).as_ptr();
-//         // let dst_ptr = buffer.as_mut_ptr();
-//         // unsafe { ptr::copy_nonoverlapping(src_ptr, dst_ptr, read_len) };
-//         // see example in: https://doc.rust-lang.org/std/ptr/fn.copy_nonoverlapping.html why next line is adviced
-//         //dst_ptr.set_len(read_len);
-
-//         read_len
-//     }
-
-// }
-
-
-
-// impl Read for S3File {
-//     fn read(&mut self, buff: &mut [u8]) -> IOResult<usize> {
-//         let buff_len = buff.len();
-//         let mut read_len = 0;
-//         let mut window: &mut  [u8] = buff;
-//         while buff_len - read_len > 0 {
-//             println!("Read segment after {} bytes to Window for at most {} bytes.", read_len, buff_len - read_len);
-//             let len = self.read_segment(window, buff_len - read_len);
-//             //shift the window forward (position has been updated already)
-//             window = &mut window[len..];
-//             read_len += len;
-//         }
-//         println!("Read buff '{}'.", str::from_utf8(&buff).unwrap());
-//         Ok(read_len)
-//     }
-// }
-
-// impl Seek for S3File {
-//     fn seek(&mut self, pos: SeekFrom) -> IOResult<u64> {
-//         let new_pos: i64 = match pos {
-//             SeekFrom::Start(upos) =>  upos as i64,
-//             SeekFrom::Current(ipos) =>   self.position as i64 + ipos,
-//             // SeekFrom::End(ipos) -> {
-//             //     match self.get_length() {
-//             //         Ok(len) -> len as i64 + ipos,
-//             //         Err(e) -> return Err(e)
-//             //     }
-//             SeekFrom::End(ipos) => self.get_length()? as i64 + ipos
-//             }; 
-
-//         // check the validity of the new position
-//         if  new_pos < 0 {
-//             return Err(IOError::new(IOErrorKind::InvalidInput, "Position should not before 0."));
-//         } else if new_pos > self.get_length()? as i64 {
-//             return Err(IOError::new(IOErrorKind::UnexpectedEof, "Position beyond size of S3-object."));
-//         }
-
-//         self.position = new_pos as usize;
-//         Ok(self.position as u64)
-//     }
-
-// //    fn rewind(&mut self) -> Result<()> { ... }
-// //    fn stream_len(&mut self) -> Result<u64> { ... }
-    
-//     fn stream_position(&mut self) -> IOResult<u64> {
-//         Ok(self.position as u64)
-//     }
-// }
 
 #[cfg(test)]
 pub mod tests {
 
-    use aws_config::meta::region::RegionProviderChain;
-    use aws_sdk_s3::{Client, 
-        //Error, 
-        Region};
+    // use aws_config::meta::region::RegionProviderChain;
+    use aws_sdk_s3::{Client, Region};
     //use aws_smithy_http::byte_stream::{ByteStream, AggregatedBytes};
     use uuid::Uuid;
  //   use futures::executor::block_on;
@@ -197,15 +23,12 @@ pub mod tests {
     use crate::{
         s3_service,
         s3_file::S3File, 
-        source::REGION};
+        client::get_region_client};
     
     async fn setup() -> (Region, Client, String, String, String, String) {
-        let region_provider = RegionProviderChain::first_try(Region::new(REGION));
-        let region = region_provider.region().await.unwrap();
     
-        let shared_config = aws_config::from_env().region(region_provider).load().await;
-        let client = Client::new(&shared_config);
-    
+        let (region, client) = get_region_client().await;
+
         let bucket_name = format!("{}{}", "doc-example-bucket-", Uuid::new_v4().to_string());
         let file_name = "./test_upload.txt".to_string();
         let key = "test file key name".to_string();
@@ -269,16 +92,16 @@ pub mod tests {
     }
 
 
-    // create a test-input file and run the test.
-    pub async fn read_from_s3_aux(test_data: &[u8]) -> (Box<[u8]>, Box<[u8]>,Box<[u8]>) {
-        let (region, client, bucket_name, file_name, object_name, target_key) = setup().await;
-        s3_service::create_bucket(&client, &bucket_name, region.as_ref()).await.expect("Failed to create bucket");
+    // // create a test-input file and run the test.
+    // pub async fn read_from_s3_aux(test_data: &[u8]) -> (Box<[u8]>, Box<[u8]>,Box<[u8]>) {
+    //     let (region, client, bucket_name, file_name, object_name, target_key) = setup().await;
+    //     s3_service::create_bucket(&client, &bucket_name, region.as_ref()).await.expect("Failed to create bucket");
     
-        // create the file for testing
-        s3_service::upload_object(&client, &bucket_name, &file_name, &object_name, test_data).await.expect("Failed to create Object in bucket");
+    //     // create the file for testing
+    //     s3_service::upload_object(&client, &bucket_name, &file_name, &object_name, test_data).await.expect("Failed to create Object in bucket");
 
-        // the actual test.
-        test_read_S3File_aux(Some(&bucket_name), &object_name)
-    }
+    //     // the actual test.
+    //     test_read_S3File_aux(Some(&bucket_name), &object_name)
+    // }
     
 }

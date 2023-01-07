@@ -1,19 +1,14 @@
 
-use aws_sdk_s3::{Client, Region};
-use aws_config::meta::region::RegionProviderChain;
+use aws_sdk_s3::Client;
 use std::{
     io::Result as IOResult,
-    str,
     sync::{
-        //Arc, Mutex, 
         MutexGuard}};
 use bytes::Bytes;
 use futures::executor::block_on;
 use async_trait::async_trait;
 
-use crate::s3_service;
-
-pub const REGION: &str = "eu-central-1";
+use crate::{client, s3_service};
 
 
 
@@ -22,13 +17,6 @@ pub trait GetBytes  {
     async fn get_bytes(&self, start: usize, end: usize) -> Bytes;
 }
 
-async fn get_client() -> Client {
-    let region_provider = RegionProviderChain::first_try(Region::new(REGION));
-    //let region = region_provider.region().await.unwrap();
-
-    let shared_config = aws_config::from_env().region(region_provider).load().await;
-    Client::new(&shared_config)
-}
 
 
 pub struct ObjectSource {
@@ -40,7 +28,7 @@ pub struct ObjectSource {
 
 impl ObjectSource {
     pub fn new(bucket: String, object: String) -> Self {
-        Self{client: block_on(get_client()), 
+        Self{client: block_on(client::get_client()), 
             bucket, 
             object, 
             length: None}
