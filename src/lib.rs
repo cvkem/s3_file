@@ -1,12 +1,15 @@
 pub use client::{get_client, get_region_client};
 pub use s3_service::delete_buckets_with_prefix;
-pub use s3_file::S3File;
+pub use s3_reader::S3Reader;
+pub use s3_writer::S3Writer;
 
 mod client;
 pub mod s3_service;
 mod lru_cache;
-mod source;
-mod s3_file;
+mod object_reader;
+mod object_writer;
+mod s3_reader;
+mod s3_writer;
 
 
 
@@ -22,7 +25,7 @@ pub mod tests {
 
     use crate::{
         s3_service,
-        s3_file::S3File, 
+        s3_reader::S3Reader, 
         client::get_region_client};
     
     async fn setup() -> (Region, Client, String, String, String, String) {
@@ -45,7 +48,7 @@ pub mod tests {
         // use a default bucket if none is specified
         let bucket_name = bucket_name.unwrap_or(&DEFAULT_BUCKET);
         // test 1
-        let mut s3file_1 = S3File::new(bucket_name.to_owned(), object_name.to_string(), 10);
+        let mut s3file_1 = S3Reader::new(bucket_name.to_owned(), object_name.to_string(), 10);
 
         let buff_len = 10;
         let mut buff1: Box<[u8]> = vec![0;buff_len].into_boxed_slice();
@@ -74,7 +77,7 @@ pub mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_seek_S3File() {
-        let mut s3file_1 = S3File::new(DEFAULT_BUCKET.to_owned(), DEFAULT_OBJECT.to_owned(), 15);
+        let mut s3file_1 = S3Reader::new(DEFAULT_BUCKET.to_owned(), DEFAULT_OBJECT.to_owned(), 15);
 
         let buff_len = 36;
         let mut buff1: Box<[u8]> = vec![0;buff_len].into_boxed_slice();

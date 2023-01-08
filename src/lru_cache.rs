@@ -5,9 +5,9 @@ use bytes::Bytes;
 use futures::executor::block_on;
 
 
-use crate::source::{
+use crate::object_reader::{
     GetBytes,
-    ObjectSource};
+    ObjectReader};
 
 
 pub struct ObjBlock {
@@ -19,14 +19,14 @@ pub struct ObjBlock {
 
 pub struct LruCache {
     block_size: usize,
-    source: Arc<Mutex<ObjectSource>>,
+    source: Arc<Mutex<ObjectReader>>,
     pub cache: Vec<ObjBlock>  // should be private, but then find_cache_block should return a reference. TODO: fix this
 }
 
 
 impl LruCache {
 
-    pub fn new(num_blocks: usize, block_size: usize, source: Arc<Mutex<ObjectSource>>) -> Self {
+    pub fn new(num_blocks: usize, block_size: usize, source: Arc<Mutex<ObjectReader>>) -> Self {
         LruCache {block_size, 
             source,
             cache: Vec::<ObjBlock>::with_capacity(num_blocks)}

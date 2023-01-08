@@ -1,7 +1,7 @@
 use std::{
     str,
     io::Read};
-use S3_file::{self, get_region_client, s3_service, S3File};
+use S3_file::{self, get_region_client, s3_service, S3Reader};
 use aws_sdk_s3::{Client, Error, Region};
 use uuid::Uuid;
 
@@ -29,7 +29,7 @@ pub fn test_read_S3File_aux(bucket_name: Option<&str>, object_name: &str) -> (Bo
     // use a default bucket if none is specified
     let bucket_name = bucket_name.unwrap_or(&DEFAULT_BUCKET);
     // test 1
-    let mut s3file_1 = S3File::new(bucket_name.to_owned(), object_name.to_string(), 10);
+    let mut s3file_1 = S3Reader::new(bucket_name.to_owned(), object_name.to_string(), 10);
 
     let buff_len = 10;
     let mut buff1: Box<[u8]> = vec![0;buff_len].into_boxed_slice();

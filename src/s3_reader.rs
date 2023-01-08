@@ -11,22 +11,22 @@ use std::{
 
 
 use crate::lru_cache::LruCache;
-use crate::source::ObjectSource;
+use crate::object_reader::ObjectReader;
 
 
 
-pub struct S3File {
+pub struct S3Reader {
     cache: LruCache,
-    source: Arc<Mutex<ObjectSource>>,
+    source: Arc<Mutex<ObjectReader>>,
     pub position: usize
 }
 
 
-impl S3File {
+impl S3Reader {
     
     /// create a new S3File with an LRU-cache to support fast (sequential) read operations
     pub fn new(bucket: String, object: String, block_size: usize) -> Self {
-        let source = Arc::new(Mutex::new(ObjectSource::new(bucket, object)));
+        let source = Arc::new(Mutex::new(ObjectReader::new(bucket, object)));
         let cache = LruCache::new(10, block_size, Arc::clone(&source)); 
 
         Self{
@@ -60,7 +60,7 @@ impl S3File {
 }
 
 
-impl Read for S3File {
+impl Read for S3Reader {
     fn read(&mut self, buff: &mut [u8]) -> IOResult<usize> {
         let buff_len = buff.len();
         let mut read_len = 0;
@@ -77,7 +77,7 @@ impl Read for S3File {
     }
 }
 
-impl Seek for S3File {
+impl Seek for S3Reader {
     fn seek(&mut self, pos: SeekFrom) -> IOResult<u64> {
         let new_pos: i64 = match pos {
             SeekFrom::Start(upos) =>  upos as i64,

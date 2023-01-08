@@ -19,14 +19,14 @@ pub trait GetBytes  {
 
 
 
-pub struct ObjectSource {
+pub struct ObjectReader {
     client: Client,
     pub bucket: String,
     pub object: String,
-    length: Option<usize>,
+    length: Option<usize>    
 }
 
-impl ObjectSource {
+impl ObjectReader {
     pub fn new(bucket: String, object: String) -> Self {
         Self{client: block_on(client::get_client()), 
             bucket, 
@@ -44,10 +44,13 @@ impl ObjectSource {
         Ok(*length as u64)
     }
 
+    // pub fn close(self) -> IOResult<()> {
+    //     // TODO: implement it
+    // }
 }
 
 #[async_trait]
-impl GetBytes for MutexGuard<'_, ObjectSource> {
+impl GetBytes for MutexGuard<'_, ObjectReader> {
 
     async fn get_bytes(&self, block_start: usize, block_end: usize) -> Bytes {
         let range = format!("bytes={block_start}-{block_end}");
