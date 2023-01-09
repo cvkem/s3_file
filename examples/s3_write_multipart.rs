@@ -1,5 +1,6 @@
 use std::{
-    io::Write
+    io::Write,
+    time::Instant
 };
 use futures::executor::block_on;
 use S3_file::{s3_service, get_region_client, S3Writer};
@@ -18,7 +19,10 @@ fn create_test_bucket() -> String {
     bucket_name
 }
 
-const NUM_ALPHA: usize = 200000;
+const NUM_ALPHA: usize = 200_000;
+
+const THOUSAND_BLOCKS: bool = false;
+
 #[tokio::main]
 async fn main() {
 
@@ -31,23 +35,57 @@ async fn main() {
 
     let alphabeth = b"abcdefghijklmnopqrstuvwxyz\n";
 
-    let mut content = [0u8; NUM_ALPHA*27];
-    for i in 0..NUM_ALPHA {
-        let start = i * 27;
-        let target_region = &mut content[start..(start+27)];
+    let timer = Instant::now();
+    let timer_2 = Instant::now();
 
-        target_region.clone_from_slice(alphabeth);
-    }
+    if THOUSAND_BLOCKS {
+        let mut content = [0u8; NUM_ALPHA*27/1000];
+        for i in 0..(NUM_ALPHA/1000) {
+            let start = i * 27;
+            let target_region = &mut content[start..(start+27)];
+    
+            target_region.clone_from_slice(alphabeth);
+        }
 
-    match s3_writer.write(&content) {
-        Ok(res) => println!("Succesfully written {res} bytes"),
-        Err(err) => println!("write failed with {err:?}")
+        println!("==>  Building data Duration  {:?}", timer.elapsed());
+
+        let mut num_written = 0;
+        for i in 0..1000 {
+            match s3_writer.write(&content) {
+                Ok(res) => num_written += res,
+                Err(err) => println!("write failed with {err:?}")
+            }    
+        }
+        println!("Succesfully written {num_written} bytes");
+        println!("==>  Written all data Duration  {:?}", timer.elapsed());
+    
+    } else {
+        let mut content = [0u8; NUM_ALPHA*27];
+        for i in 0..NUM_ALPHA {
+            let start = i * 27;
+            let target_region = &mut content[start..(start+27)];
+    
+            target_region.clone_from_slice(alphabeth);
+        }
+
+        println!("==>  Building data Duration  {:?}", timer.elapsed());
+        println!("==>  Building data Duration-2  {:?}", timer.elapsed());
+
+        match s3_writer.write(&content) {
+            Ok(res) => println!("Succesfully written {res} bytes"),
+            Err(err) => println!("write failed with {err:?}")
+        }
+
+        println!("==>  Written all data Duration  {:?}", timer.elapsed());
+        println!("==>  Written all data Duration  SECOND {:?}", timer_2.elapsed());
+    
     }
 
     println!("Reported length of object: {}", s3_writer.get_length());
 
     s3_writer.flush();
 
+    println!("==>  Flushed all data Duration  {:?}", timer.elapsed());
 
     println!("Reported length of object (after Flush): {}", s3_writer.get_length());
 
@@ -55,6 +93,7 @@ async fn main() {
     if let Err(err) = s3_writer.close() {
         eprintln!("\n======================\n{err:?}\n");
     };
+
 
     println!("Closed the object. Check S3 if the object now exists");
 }
