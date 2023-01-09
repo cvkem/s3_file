@@ -2,13 +2,14 @@ use aws_sdk_s3::{
     Client,
     types::ByteStream};
 use std::{
+    borrow::Borrow,
     io::{self, Result as IOResult},
     mem};
 use bytes::Bytes;
 use async_trait::async_trait;
 use futures::executor::block_on;
 
-use crate::client;
+use crate::{client, s3_aux};
 
 use aws_sdk_s3::model::{CompletedMultipartUpload, CompletedPart};
 use aws_sdk_s3::output::CreateMultipartUploadOutput;
@@ -53,6 +54,18 @@ impl ObjectWriter {
         self.last_part_nr += 1;
         return self.last_part_nr
     }
+
+    /// static Upload a file as a single_shot upload.
+    /// Used for small files, as multi-part uploads require all chuncks to be at least 5Mb, so that can not be used for ssmall files.
+    pub fn single_shot_upload(bucket_name: &str, object_name: &str, buffer: Bytes) -> io::Result<()> {
+
+        let client = block_on(client::get_client());
+        match block_on(s3_aux::upload_object(&client, bucket_name, object_name, buffer.borrow())) {
+            Ok(()) => Ok(()),
+            Err(err) => Err(io::Error::new(io::ErrorKind::Other, format!("{err:?}")))
+        }
+    }
+
 }
 
 
@@ -143,5 +156,5 @@ impl ObjectWriterAux for ObjectWriter {
 
         Ok(())
     }
-    
+
 }

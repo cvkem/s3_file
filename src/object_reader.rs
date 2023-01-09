@@ -8,7 +8,7 @@ use bytes::Bytes;
 use futures::executor::block_on;
 use async_trait::async_trait;
 
-use crate::{client, s3_service};
+use crate::{client, s3_aux};
 
 
 
@@ -38,7 +38,7 @@ impl ObjectReader {
     pub fn get_length(&mut self) -> IOResult<u64> {
         let length = self.length.get_or_insert( //|| 
             block_on(async {
-                s3_service::head_object(&self.client, &self.bucket, &self.object)
+                s3_aux::head_object(&self.client, &self.bucket, &self.object)
                 .await
                 .content_length() as usize}));
         Ok(*length as u64)
@@ -55,7 +55,7 @@ impl GetBytes for MutexGuard<'_, ObjectReader> {
     async fn get_bytes(&self, block_start: usize, block_end: usize) -> Bytes {
         let range = format!("bytes={block_start}-{block_end}");
         // should be seperate function to read bytes for a cache-block
-        let get_obj_output = s3_service::download_object(&self.client, &self.bucket, &self.object, Some(range)).await;
+        let get_obj_output = s3_aux::download_object(&self.client, &self.bucket, &self.object, Some(range)).await;
         println!("Received object {:?}", get_obj_output);
         // set length of full object when not readily available, as we get this information free of charge here.
 // TODO: add next line again and make self mutable

@@ -172,14 +172,11 @@ Donec in accumsan odio. Integer faucibus velit posuere sem commodo tincidunt. Fu
 Donec mollis finibus metus in cursus. In blandit ornare purus. Vestibulum a ipsum diam. Curabitur vel iaculis diam, id egestas ligula. Morbi condimentum imperdiet tellus. Aenean ut ligula nulla. Nam quis auctor odio. Sed eget blandit magna, sit amet consectetur ex. Quisque fermentum nunc at nisi dictum molestie. Ut tempus fermentum ipsum, vel aliquet sem rutrum quis. Nunc nec tristique diam.
 Touch test.";
 
-#[allow(dead_code)]
-// snippet-start:[rust.example_code.s3.basics.upload_object]
-// snippet-start:[rust.example_code.s3.basics.put_object]
+
 pub async fn upload_object(
     client: &Client,
     bucket_name: &str,
-    file_name: &str,
-    key: &str,
+    object_name: &str,
     body: &[u8]
 ) -> Result<(), Error> {
 //    let body = ByteStream::from_static(UPLOAD_CONTENT);
@@ -187,13 +184,13 @@ pub async fn upload_object(
     client
         .put_object()
         .bucket(bucket_name)
-        .key(key)
+        .key(object_name)
         //.body(body.unwrap())
         .body(body)
         .send()
         .await?;
 
-    println!("Uploaded file: {}", file_name);
+    println!("Uploaded to bucket: {bucket_name}:{object_name}");
     Ok(())
 }
 // snippet-end:[rust.example_code.s3.basics.put_object]

@@ -1,10 +1,10 @@
 pub use client::{get_client, get_region_client};
-pub use s3_service::delete_buckets_with_prefix;
+pub use s3_aux::delete_buckets_with_prefix;
 pub use s3_reader::S3Reader;
 pub use s3_writer::S3Writer;
 
 mod client;
-pub mod s3_service;
+pub mod s3_aux;
 mod lru_cache;
 mod object_reader;
 mod object_writer;
@@ -24,7 +24,7 @@ pub mod tests {
     use std::io::{Read, Seek, SeekFrom};
 
     use crate::{
-        s3_service,
+        s3_aux,
         s3_reader::S3Reader, 
         client::get_region_client};
     

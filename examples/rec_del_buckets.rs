@@ -1,4 +1,4 @@
-use S3_file;
+use s3_file;
 use aws_sdk_s3::Error;
 
 
@@ -17,8 +17,8 @@ async fn main() -> Result<(), Error> {
 
     // run tests from main
 
-    let client = S3_file::get_client().await;
-    let results = S3_file::delete_buckets_with_prefix(&client, "doc-example-bucket").await.unwrap();
+    let client = s3_file::get_client().await;
+    let results = s3_file::delete_buckets_with_prefix(&client, "doc-example-bucket").await.unwrap();
 
     return Ok(());
 }

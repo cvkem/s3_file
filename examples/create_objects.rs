@@ -1,7 +1,7 @@
 use std::{
     str,
     io::Read};
-use S3_file::{self, get_region_client, s3_service, S3Reader};
+use s3_file::{self, get_region_client, s3_aux, S3Reader};
 use aws_sdk_s3::{Client, Error, Region};
 use uuid::Uuid;
 
@@ -50,10 +50,10 @@ pub fn test_read_S3File_aux(bucket_name: Option<&str>, object_name: &str) -> (Bo
 // create a test-input file and run the test.
 pub async fn read_from_s3_aux(test_data: &[u8]) -> (Box<[u8]>, Box<[u8]>,Box<[u8]>) {
     let (region, client, bucket_name, file_name, object_name, target_key) = setup().await;
-    s3_service::create_bucket(&client, &bucket_name, region.as_ref()).await.expect("Failed to create bucket");
+    s3_aux::create_bucket(&client, &bucket_name, region.as_ref()).await.expect("Failed to create bucket");
 
     // create the file for testing
-    s3_service::upload_object(&client, &bucket_name, &file_name, &object_name, test_data).await.expect("Failed to create Object in bucket");
+    s3_aux::upload_object(&client, &bucket_name, &object_name, test_data).await.expect("Failed to create Object in bucket");
 
     // the actual test and return three byte-arrays.
     test_read_S3File_aux(Some(&bucket_name), &object_name)
@@ -72,7 +72,7 @@ async fn main() -> Result<(), Error> {
 
 
     println!("About to enter async function.");
-    let results = read_from_s3_aux(s3_service::UPLOAD_CONTENT).await;
+    let results = read_from_s3_aux(s3_aux::UPLOAD_CONTENT).await;
     println!("\n----------------\nresults are results.0={:?} and as string: {:?}", &results.0, str::from_utf8(&results.0));
     println!("results are results.0={:?} and as string: {:?}", &results.1, str::from_utf8(&results.1));
     println!("results are results.0={:?} and as string: {:?}", &results.2, str::from_utf8(&results.2));

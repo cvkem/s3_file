@@ -3,7 +3,7 @@ use std::{
     time::Instant
 };
 use futures::executor::block_on;
-use S3_file::{s3_service, get_region_client, S3Writer};
+use s3_file::{s3_aux, get_region_client, S3Writer};
 use uuid::Uuid;
 
 const TEST_BUCKET_PREFIX: &str = "doc-example-bucket-";
@@ -13,7 +13,7 @@ fn create_test_bucket() -> String {
 
     let (region, client) = block_on(get_region_client());
 
-    block_on(s3_service::create_bucket(&client, &bucket_name, region.as_ref()))
+    block_on(s3_aux::create_bucket(&client, &bucket_name, region.as_ref()))
         .expect("Failed to create bucket");
 
     bucket_name
@@ -53,7 +53,7 @@ async fn main() {
         for _i in 0..1000 {
             match s3_writer.write(&content) {
                 Ok(res) => num_written += res,
-                Err(err) => println!("write failed with {err:?}")
+                Err(err) => eprintln!("write failed with {err:?}")
             }    
         }
         println!("Succesfully written {num_written} bytes");
@@ -73,7 +73,7 @@ async fn main() {
 
         match s3_writer.write(&content) {
             Ok(res) => println!("Succesfully written {res} bytes"),
-            Err(err) => println!("write failed with {err:?}")
+            Err(err) => eprintln!("write failed with {err:?}")
         }
 
         println!("==>  Written all data Duration  {:?}", timer.elapsed());
@@ -83,7 +83,10 @@ async fn main() {
 
     println!("Reported length of object: {}", s3_writer.get_length());
 
-    s3_writer.flush();
+    match s3_writer.flush() {
+        Ok(()) => (),
+        Err(err) => eprintln!("Flush failed: {err:?}")
+    };
 
     println!("==>  Flushed all data Duration  {:?}", timer.elapsed());
 
