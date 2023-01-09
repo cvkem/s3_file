@@ -1,7 +1,6 @@
 use std::{
     cmp,
     io,
-    mem,
     sync::{Arc, Mutex}
 };
 use bytes::{BytesMut, BufMut};
@@ -13,7 +12,7 @@ use crate::object_writer::{ObjectWriter, ObjectWriterAux};
 pub struct S3Writer {
     block_size: usize,
     started: bool,
-    buffer: BytesMut,
+    buffer: Option<BytesMut>,
     source: Arc<Mutex<ObjectWriter>>,
     num_blocks: usize,
     length: usize
@@ -26,12 +25,12 @@ impl S3Writer {
     pub fn new(bucket: String, object: String, block_size: usize) -> Self {
         let source = Arc::new(Mutex::new(ObjectWriter::new(bucket, object)));
 
-        let buffer = BytesMut::with_capacity(block_size);
+//        let buffer = BytesMut::with_capacity(block_size);
     
         Self{
             block_size,
             started: false,
-            buffer,
+            buffer: None,
             source,
             num_blocks: 0,
             length: 0
@@ -40,6 +39,13 @@ impl S3Writer {
 
     // flush the current buffer (Auxiliary as we also need it before the io::Write implementation is known.)
     fn flush_aux(&mut self) -> io::Result<()> {
+        let buffer = match self.buffer.take() {
+            None => { 
+                    println!("Buffers is empty, so nothing to flush.");
+                    return Ok(())
+                }
+            Some (buffer) => buffer.freeze()
+        };
 
         if !self.started {
             // do initialization at the last possible moment, such that we reduce risk on debris.
@@ -47,16 +53,9 @@ impl S3Writer {
             self.started = true;           
         }
 
-        if self.buffer.len() < 1 {
-            println!("No bytes to flush");
-            return Ok(());
-        }
-        let mut buffer = BytesMut::with_capacity(self.block_size);
-        mem::swap(&mut self.buffer, &mut buffer);
-
-        let buffer = buffer.freeze(); // automatically truncates to the used length!
         self.num_blocks += 1;
         self.length += buffer.len();
+
         block_on(self.source.lock().unwrap().upload_part(buffer))?;
         
         Ok(())
@@ -73,27 +72,39 @@ impl S3Writer {
         self.length
     }
 
+    /// internal function to create a buffer when it does not exist yet
+    /// Ensures last minute generation of a buffer, for example to prevent that the last flush
+    /// tries to allocate a buffer that is never used
+    fn check_get_buffer(&mut self) {
+        match self.buffer {
+            None => self.buffer = Some(BytesMut::with_capacity(self.block_size)),
+            Some(_) => () 
+        }
+    }
+
 }
 
 
 impl io::Write for S3Writer {
 
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
         let mut num_written = 0_usize;
         let mut start_pos = 0_usize;
 
-        while start_pos < buf.len() {
-            // we should create the buffer here, such that it is allocated last-minute if it does not exist.
-            let buff_space = self.block_size - self.buffer.len();
-            let max_to_write = buf.len() - start_pos;
-            let to_write = cmp::min(buff_space, max_to_write);
+        while start_pos < data.len() {
+
+            self.check_get_buffer();
+
+            let buff_space = self.block_size - self.buffer.as_ref().unwrap().len();
+            let remaining_data = data.len() - start_pos;
+            let to_write = cmp::min(buff_space, remaining_data);
             let end_pos = start_pos + to_write;
 
-            let bytes_to_write = &buf[start_pos..end_pos];
+            let bytes_to_write = &data[start_pos..end_pos];
 
-            self.buffer.put(bytes_to_write);
+            self.buffer.as_mut().unwrap().put(bytes_to_write);
             
-            if self.buffer.len() >= self.block_size {
+            if self.buffer.as_ref().unwrap().len() >= self.block_size {
                 if let Err(err) = self.flush_aux() {
                     eprintln!("Observed error during flush of block {}", self.num_blocks);
                     return Err(err);

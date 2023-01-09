@@ -50,7 +50,7 @@ async fn main() {
         println!("==>  Building data Duration  {:?}", timer.elapsed());
 
         let mut num_written = 0;
-        for i in 0..1000 {
+        for _i in 0..1000 {
             match s3_writer.write(&content) {
                 Ok(res) => num_written += res,
                 Err(err) => println!("write failed with {err:?}")
