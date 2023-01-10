@@ -15,6 +15,7 @@ use aws_sdk_s3::model::{CompletedMultipartUpload, CompletedPart};
 use aws_sdk_s3::output::CreateMultipartUploadOutput;
 
 
+pub const MIN_CHUNK_SIZE: usize = 1024 * 1024 * 5;
 
 pub struct ObjectWriter {
     client: Client,

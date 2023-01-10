@@ -6,7 +6,7 @@ use std::{
 use bytes::{BytesMut, BufMut};
 use futures::executor::block_on;
 
-use crate::object_writer::{ObjectWriter, ObjectWriterAux};
+use crate::object_writer::{ObjectWriter, ObjectWriterAux, MIN_CHUNK_SIZE};
 
 enum S3WriterState {
     None,
@@ -58,6 +58,10 @@ impl S3Writer {
     
     /// create a new S3File with an LRU-cache to support fast (sequential) read operations
     pub fn new(bucket_name: String, object_name: String, block_size: usize) -> Self {
+        if block_size < MIN_CHUNK_SIZE {
+            println!("The minimal block-size for a multi-part upload is 5Mb!");
+        }
+
         Self{
             bucket_name,
             object_name,
@@ -82,11 +86,11 @@ impl S3Writer {
         };
 
         if self.state.is_none() {
-            if buffer.len() < self.block_size {
-                // we can write the buffer in one pass
+            if buffer.len() < MIN_CHUNK_SIZE {
+                // we should the buffer in one pass as small batches (<5Mb) are not possible in an S3 multipart upload.
                 println!("Buffer has length {} while the block_size is {}, thus using write single-blob method", buffer.len(), self.block_size);
                 ObjectWriter::single_shot_upload(&self.bucket_name, &self.object_name, buffer)?;
-                // we are ready so retturn
+                // we are ready so return
                 self.state = S3WriterState::Done;
                 return Ok(());
             } else {
@@ -96,7 +100,6 @@ impl S3Writer {
             }
         }
 
-
         self.num_blocks += 1;
         self.length += buffer.len();
 
@@ -104,6 +107,7 @@ impl S3Writer {
         
         Ok(())
     }
+
 
     /// flush all data and close the S3Writer.
     pub fn close(mut self) -> io::Result<()> {
@@ -135,6 +139,7 @@ impl S3Writer {
     pub fn get_length(&self) -> usize {
         self.length
     }
+
 
     /// internal function to create a buffer when it does not exist yet
     /// Ensures last minute generation of a buffer, for example to prevent that the last flush
