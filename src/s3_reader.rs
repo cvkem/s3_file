@@ -16,7 +16,7 @@ use crate::object_reader::ObjectReader;
 
 
 pub struct S3Reader {
-    cache: LruCache,
+    cache: Arc<Mutex<LruCache>>,
     source: Arc<Mutex<ObjectReader>>,
     pub position: usize
 }
@@ -28,6 +28,7 @@ impl S3Reader {
     pub fn new(bucket: String, object: String, block_size: usize) -> Self {
         let source = Arc::new(Mutex::new(ObjectReader::new(bucket, object)));
         let cache = LruCache::new(10, block_size, Arc::clone(&source)); 
+        let cache = Arc::new(Mutex::new(cache));
 
         Self{
             cache,
@@ -38,8 +39,8 @@ impl S3Reader {
 
     /// get the filled cache-block and fill up the buffer over to at most 'max_len' bytes. Return the number of read bytes.
     fn read_segment(&mut self, buffer: &mut[u8], max_len: usize) -> usize {
-        let block_idx = self.cache.find_cached_block(self.position);
-        let block = &self.cache.cache[block_idx];
+        let block = self.cache.lock().unwrap().find_cached_block(self.position);
+//        let block = &self.cache.lock().unwrap().cache[block_idx];
         let relative_position = self.position - block.start;
         let read_len = cmp::min(max_len, block.data.len() - relative_position);
 
