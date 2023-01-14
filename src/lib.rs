@@ -10,7 +10,7 @@ mod object_reader;
 mod object_writer;
 mod s3_reader;
 mod s3_writer;
-
+mod write_sink;
 
 
 #[cfg(test)]

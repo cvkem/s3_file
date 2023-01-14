@@ -18,7 +18,9 @@ async fn main() -> Result<(), Error> {
     // run tests from main
 
     let client = s3_file::get_client().await;
-    let results = s3_file::delete_buckets_with_prefix(&client, "doc-example-bucket").await.unwrap();
+    if let Err(err) = s3_file::delete_buckets_with_prefix(&client, "doc-example-bucket").await {
+        eprintln!("Error while deletion of buckets: {err:?}");
+    };
 
     return Ok(());
 }

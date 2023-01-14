@@ -1,16 +1,19 @@
 use std::{
     cmp,
     io,
-    sync::{Arc, Mutex}
+    sync::{Arc, Mutex}, 
+//    sync::mpsc,
+//    thread
 };
 use bytes::{BytesMut, BufMut};
-use futures::executor::block_on;
+use crate::write_sink::WriteSink;
+use crate::object_writer::{ObjectWriter, MIN_CHUNK_SIZE};
 
-use crate::object_writer::{ObjectWriter, ObjectWriterAux, MIN_CHUNK_SIZE};
+
 
 enum S3WriterState {
     None,
-    Multipart{ writer: Arc<Mutex<ObjectWriter>>},
+    Multipart(Arc<Mutex<WriteSink>>),
     Done   // either a single file uploaded, of ObjectWriter has been closed.
 }
 
@@ -25,13 +28,13 @@ impl S3WriterState {
     }
 
     fn is_multipart(&self) -> bool {
-        if let S3WriterState::Multipart{writer: _} = self {true } else {false}
+        if let S3WriterState::Multipart(_) = self {true } else {false}
     }
 
     // get writer or return an error.
-    fn get_writer(&self) -> io::Result<Arc<Mutex<ObjectWriter>>> {
-        if let S3WriterState::Multipart { writer } = self {
-            Ok(writer.clone())
+    fn get_write_sink(&self) -> io::Result<Arc<Mutex<WriteSink>>> {
+        if let S3WriterState::Multipart(write_sink) = self {
+            Ok(write_sink.clone())
         } else {
             match self {
                 S3WriterState::None => Err(io::Error::new(io::ErrorKind::Other, "Failed to get writer. Multi-part writer not initialized.")),
@@ -93,17 +96,16 @@ impl S3Writer {
                 // we are ready so return
                 self.state = S3WriterState::Done;
                 return Ok(());
-            } else {
-                let mut source = ObjectWriter::new(self.bucket_name.clone(), self.object_name.clone());
-                block_on(source.create_multipart_upload())?;
-                self.state = S3WriterState::Multipart{ writer: Arc::new(Mutex::new(source))};
+            } else {                
+                let write_sink = WriteSink::new(self.bucket_name.to_owned(), self.object_name.to_owned());
+                self.state = S3WriterState::Multipart(Arc::new(Mutex::new(write_sink)));
             }
         }
 
         self.num_blocks += 1;
         self.length += buffer.len();
 
-        block_on(self.state.get_writer()?.lock().unwrap().upload_part(buffer))?;
+        self.state.get_write_sink()?.lock().unwrap().send_bytes(buffer);
         
         Ok(())
     }
@@ -123,16 +125,12 @@ impl S3Writer {
                     // the alternative is to increase block-size by 1, which is ugly, but would work too.
                     let buffer = self.buffer.take().unwrap().freeze(); 
                     ObjectWriter::single_shot_upload(&self.bucket_name, &self.object_name, buffer)?;
-                    // we are ready so retturn
+                    // we are ready so return
                     self.state = S3WriterState::Done;
                     Ok(())
                 },
             S3WriterState::Done => Ok(()), 
-            S3WriterState::Multipart { writer } => {
-                    //self.flush_aux()?;  // tkane out of match statement to the top, to prevent mutable borrow while holding unmutable borrow.
-                    block_on(writer.lock().unwrap().close())?;
-                    Ok(())       
-                }
+            S3WriterState::Multipart(write_sink) => write_sink.lock().unwrap().close()
         }
     }
 
