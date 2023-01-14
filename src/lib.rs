@@ -12,6 +12,8 @@ mod s3_reader;
 mod s3_writer;
 mod write_sink;
 
+mod chunk_reader;
+
 
 #[cfg(test)]
 pub mod tests {
