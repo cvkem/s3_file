@@ -98,5 +98,5 @@ async fn main() {
     };
 
 
-    println!("Closed the object. Check S3 if the object now exists");
+    println!("Total time for writing object: {:?}\nClosed the object. Check S3 if the object now exists", timer.elapsed());
 }
