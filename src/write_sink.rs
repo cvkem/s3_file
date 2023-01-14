@@ -6,7 +6,8 @@ use bytes::{Bytes};
 use tokio;
 use crate::object_writer::{ObjectWriter, ObjectWriterAux};
 
-
+/// WriteSink is a bridge between the synchronous world and the Asyncronous AWS-S3-library and creates a separate thread for async writing of S3-objects.
+/// A channel is used to communicate between the synchronous world and the asynchronous ObjectWriter.
 pub struct WriteSink {
     handle: Option<thread::JoinHandle<()>>,
     send_channel: Option<tokio::sync::mpsc::Sender<Bytes>>
@@ -14,6 +15,11 @@ pub struct WriteSink {
 
 impl WriteSink {
 
+    /// Build a new write-sync by:
+    /// - setting up the channel to send and received Bytes-chunks
+    /// - create the async runtime
+    /// - set up a thread and pass the runtime and the receiving channel into this (normal) thread
+    /// - Return a newly creates WriteSink object.
     pub fn new(bucket_name: String, object_name: String) -> Self {
 
         let (send_channel, mut receiver_channel) = tokio::sync::mpsc::channel(2);
@@ -55,6 +61,7 @@ impl WriteSink {
         Self {handle, send_channel}
     }
 
+    /// Send a chunk of Bytes to the object.
     pub fn send_bytes(&self, bytes: Bytes) {
         match self.send_channel.as_ref().unwrap().blocking_send(bytes) {
             Ok(()) => {},
@@ -62,6 +69,8 @@ impl WriteSink {
         }
     }
 
+    /// Close the channel to signal that the object has been completely written.
+    /// Next the thread that contains/backs the asynchronous runtime is joined to ensure writting has been completed.
     pub fn close(&mut self) -> io::Result<()> {
         drop(self.send_channel.take());
         if let Err(err) = self.handle
