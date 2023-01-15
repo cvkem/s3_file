@@ -1,46 +1,34 @@
 
 use std::{
     cell::RefCell,
-    io::{self, Read},
-    sync::Arc};
+    cmp,
+    io::{self, Read}};
 use parquet::{
-    file::reader::{ChunkReader, Length},
-    io::util::TryClone};
+    errors::Result,
+    file::reader::{ChunkReader}};
 use crate::s3_reader::S3Reader;
 
 
 impl ChunkReader for S3Reader {
-    type T = S3ReaderChunk<S3Reader>;
+    type T = S3ReaderChunk;
 
-    fn get_read(&self, start: u64, length: usize) -> io::Result<Self::T> {
+    fn get_read(&self, start: u64, length: usize) -> Result<Self::T> {
         Ok(S3ReaderChunk::new(self, start, length))
     }
 }
 
-impl TryClone for S3Reader {
-    fn try_clone(&self) -> Result<Self> {
-        let cache = Arc::clone(&self.cache);
-        let source = Arc::clone(&self.source);
-        let position = self.position;
 
-        let clone = S3Reader {
-            cache,
-            source,
-            position
-        };
-        Ok(clone)
-    }
-}
-
-struct S3ReaderChunk<R :Read> {
-    reader: RefCell<R>,
+pub struct S3ReaderChunk {
+    reader: RefCell<S3Reader>,
     start: u64,
     end: u64
 }
 
-impl<R: Read> S3ReaderChunk<R> {
-    pub fn new(fd: &R, start: u64, length: usize) -> Self {
-        let reader = RefCell::new(fd.try_clone().unwrap());
+impl S3ReaderChunk {
+    pub fn new(s3_reader: &S3Reader, start: u64, length: usize) -> Self {
+        let mut reader = s3_reader.clone();
+        reader.position = start as usize;
+        let reader = RefCell::new(reader);
 //        let reader = RefCell::new(fd);
         Self {
             reader,
@@ -54,10 +42,55 @@ impl<R: Read> S3ReaderChunk<R> {
 }
 
 
-impl<R: Read> Read for S3ReaderChunk<R> {
+impl Read for S3ReaderChunk {
 
+    /// sequential read of the chunk, ut do not read beyond the end of the chunk!
+    fn read(&mut self, buff: &mut [u8]) -> io::Result<usize> {
+        let len = buff.len();
+        let pos = {self.reader.borrow().position};
+        let max_len = self.end - (pos as u64);
+        let max_buff_len: usize = cmp::min(len, max_len.try_into().unwrap());
+        let max_buff = &mut buff[..max_buff_len];
+
+        self.reader.borrow_mut().read(max_buff)
+    }
 }
 
-impl Length for S3Reader {
+// impl ChunkReader for S3Reader {
+//     type T = S3ReaderChunk<S3Reader>;
 
-}
+//     fn get_read(&self, start: u64, length: usize) -> Result<Self::T> {
+//         Ok(S3ReaderChunk::new(self, start, length))
+//     }
+// }
+
+
+// struct S3ReaderChunk<R :Read> {
+//     reader: RefCell<R>,
+//     start: u64,
+//     end: u64
+// }
+
+// impl<R: Read> S3ReaderChunk<R> {
+//     pub fn new(fd: &R, start: u64, length: usize) -> Self {
+//         let s3_reader: &S3Reader = fd;
+//         let reader = S3Reader::clone(s3_reader);
+//         let reader = RefCell::new(reader);
+// //        let reader = RefCell::new(fd);
+//         Self {
+//             reader,
+//             start,
+//             end: start + length as u64,
+//             // buf: vec![0_u8; DEFAULT_BUF_SIZE],
+//             // buf_pos: 0,
+//             // buf_cap: 0,
+//         }
+//     }
+// }
+
+
+// impl<R: Read> Read for S3ReaderChunk<R> {
+//     fn read(&mut self, buff: &mut [u8]) -> io::Result<usize> {
+//         self.reader.borrow_mut().read(buff)
+//     }
+// }

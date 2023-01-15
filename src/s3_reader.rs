@@ -58,6 +58,10 @@ impl S3Reader {
         read_len
     }
 
+    fn get_length(&self) -> IOResult<u64> {
+        Ok(self.source.lock().unwrap().get_length()?)
+    }
+
 }
 
 
@@ -66,7 +70,8 @@ impl Read for S3Reader {
         let buff_len = buff.len();
         let mut read_len = 0;
         let mut window: &mut  [u8] = buff;
-        while buff_len - read_len > 0 {
+        let object_length = self.get_length()?;
+        while (buff_len - read_len > 0) & ((self.position as u64) < object_length) {
             println!("Read segment after {} bytes to Window for at most {} bytes.", read_len, buff_len - read_len);
             let len = self.read_segment(window, buff_len - read_len);
             //shift the window forward (position has been updated already)
@@ -109,3 +114,43 @@ impl Seek for S3Reader {
         Ok(self.position as u64)
     }
 }
+
+
+
+// Extensions needed for ChunkReader
+// should be under feature flag.
+
+use std::{
+    clone::Clone,
+};
+use  parquet::file::reader::Length;
+
+impl Clone for S3Reader {
+
+    fn clone(&self) -> Self {
+        let cache = Arc::clone(&self.cache);
+        let source = Arc::clone(&self.source);
+        let position = self.position;
+
+        S3Reader {
+            cache,
+            source,
+            position
+        }
+    }
+
+    fn clone_from(&mut self, source: &Self) { 
+        self.cache = Arc::clone(&source.cache);
+        self.source = Arc::clone(&source.source);
+        self.position = source.position;
+    }
+
+}
+
+impl Length for S3Reader {
+
+    fn len(&self) -> u64 {
+        self.get_length().unwrap()
+    }
+}
+
