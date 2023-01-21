@@ -6,8 +6,8 @@ use std::{
         Seek, SeekFrom, 
         Error as IOError, 
         ErrorKind as IOErrorKind},
-    str,
-    sync::{Arc, Mutex}};
+    sync::{Arc, Mutex},
+    thread};
 
 
 use crate::lru_cache::LruCache;
@@ -40,7 +40,6 @@ impl S3Reader {
     /// get the filled cache-block and fill up the buffer over to at most 'max_len' bytes. Return the number of read bytes.
     fn read_segment(&mut self, buffer: &mut[u8], max_len: usize) -> usize {
         let block = self.cache.lock().unwrap().find_cached_block(self.position);
-//        let block = &self.cache.lock().unwrap().cache[block_idx];
         let relative_position = self.position - block.start;
         let read_len = cmp::min(max_len, block.data.len() - relative_position);
 
@@ -72,13 +71,13 @@ impl Read for S3Reader {
         let mut window: &mut  [u8] = buff;
         let object_length = self.get_length()?;
         while (buff_len - read_len > 0) & ((self.position as u64) < object_length) {
-            println!("Read segment after {} bytes to Window for at most {} bytes.", read_len, buff_len - read_len);
+//            println!("Read segment after {} bytes to Window for at most {} bytes.", read_len, buff_len - read_len);
             let len = self.read_segment(window, buff_len - read_len);
             //shift the window forward (position has been updated already)
             window = &mut window[len..];
             read_len += len;
         }
-        println!("Read buff '{}'.", str::from_utf8(&buff).unwrap());
+//        println!("Read buff '{}'.", str::from_utf8(&buff).unwrap());
         Ok(read_len)
     }
 }

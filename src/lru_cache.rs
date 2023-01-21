@@ -1,5 +1,7 @@
 use std::{
+    fmt,
     sync::{Arc, Mutex},
+    thread,
     time::Instant};
 use bytes::Bytes;
 use futures::executor::block_on;
@@ -16,13 +18,21 @@ pub struct ObjBlock {
     pub data: Bytes
 }
 
-
 pub struct LruCache {
     block_size: usize,
     source: Arc<Mutex<ObjectReader>>,
     pub cache: Vec<Arc<ObjBlock>>  // should be private, but then find_cache_block should return a reference. TODO: fix this
 }
 
+impl fmt::Debug for LruCache {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LruCache")
+         .field("block_size", &self.block_size)
+//         .field("source-object-name", &self.source.get_object_name())
+         .field("cache-length", &self.cache.len())
+         .finish()
+    }
+}
 
 impl LruCache {
 

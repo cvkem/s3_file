@@ -29,14 +29,10 @@ impl S3ReaderChunk {
         let mut reader = s3_reader.clone();
         reader.position = start as usize;
         let reader = RefCell::new(reader);
-//        let reader = RefCell::new(fd);
         Self {
             reader,
             start,
             end: start + length as u64,
-            // buf: vec![0_u8; DEFAULT_BUF_SIZE],
-            // buf_pos: 0,
-            // buf_cap: 0,
         }
     }
 }
