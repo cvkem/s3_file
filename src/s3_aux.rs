@@ -181,14 +181,16 @@ pub async fn upload_object(
 ) -> Result<(), Error> {
 //    let body = ByteStream::from_static(UPLOAD_CONTENT);
     let body = ByteStream::from(Vec::from(body));
-    client
+    let fut = client
         .put_object()
         .bucket(bucket_name)
         .key(object_name)
         //.body(body.unwrap())
         .body(body)
-        .send()
-        .await?;
+        .send();
+    println!("The future has been prepared\nNow await it.");
+    
+    fut.await?;
 
     println!("Uploaded to bucket: {bucket_name}:{object_name}");
     Ok(())

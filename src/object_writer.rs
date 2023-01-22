@@ -59,12 +59,28 @@ impl ObjectWriter {
     /// static Upload a file as a single_shot upload.
     /// Used for small files, as multi-part uploads require all chuncks to be at least 5Mb, so that can not be used for ssmall files.
     pub fn single_shot_upload(bucket_name: &str, object_name: &str, buffer: Bytes) -> io::Result<()> {
-
-        let client = block_on(client::get_client());
-        match block_on(s3_aux::upload_object(&client, bucket_name, object_name, buffer.borrow())) {
-            Ok(()) => Ok(()),
-            Err(err) => Err(io::Error::new(io::ErrorKind::Other, format!("{err:?}")))
+        // let client = block_on(client::get_client());
+        // println!("Created a client ");
+        // match block_on(s3_aux::upload_object(&client, bucket_name, object_name, buffer.borrow())) {
+        //     Ok(()) => {
+        //         println!("Finished the upload of buffer with length: {}.", buffer.len());
+        //         Ok(())
+        //     },
+        //     Err(err) => Err(io::Error::new(io::ErrorKind::Other, format!("{err:?}")))
+        // }
+        let res = block_on(async move {
+            let client = client::get_client().await;
+            println!("Created a client ");
+            match s3_aux::upload_object(&client, bucket_name, object_name, buffer.borrow()).await {
+                Ok(()) => {
+                    println!("Finished the upload of buffer with length: {}.", buffer.len());
+                    Ok(())
+                },
+                Err(err) => Err(io::Error::new(io::ErrorKind::Other, format!("{err:?}")))
+            }    
         }
+        );
+        res
     }
 
 }

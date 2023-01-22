@@ -2,7 +2,7 @@ use std::{
     io,
     thread
 };
-use bytes::{Bytes};
+use bytes::Bytes;
 use tokio;
 use crate::object_writer::{ObjectWriter, ObjectWriterAux};
 
@@ -41,7 +41,7 @@ impl WriteSink {
             };
             println!(" Created multi-part upload. Now start loop.");
 
-            // on a this thread start receiving chunks of Bytes.
+            // On this thread start receiving chunks of Bytes.
             let mut receive_counter = 0;
             rt.block_on(async move {
                 while let Some(bs) = receiver_channel.recv().await {

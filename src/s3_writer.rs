@@ -53,7 +53,9 @@ pub struct S3Writer {
     state: S3WriterState,
     buffer: Option<BytesMut>,
     num_blocks: usize,
-    length: usize
+    length: usize,
+    ignore_flush_events: usize,
+    write_count: usize
 }
 
 
@@ -72,7 +74,9 @@ impl S3Writer {
             state: S3WriterState::None,
             buffer: None,
             num_blocks: 0,
-            length: 0
+            length: 0,  //only updated when the buffer is flushed to S3.
+            ignore_flush_events: 0,
+            write_count: 0
         }
     }
 
@@ -91,8 +95,10 @@ impl S3Writer {
         if self.state.is_none() {
             if buffer.len() < MIN_CHUNK_SIZE {
                 // we should the buffer in one pass as small batches (<5Mb) are not possible in an S3 multipart upload.
-                println!("Buffer has length {} while the block_size is {}, thus using write single-blob method", buffer.len(), self.block_size);
+                let buf_len = buffer.len();
+                println!("Buffer has length {} while the block_size is {}, thus using write single-blob method", buf_len, self.block_size);
                 ObjectWriter::single_shot_upload(&self.bucket_name, &self.object_name, buffer)?;
+                println!("Ready writing via single-blob method for length={}", buf_len);
                 // we are ready so return
                 self.state = S3WriterState::Done;
                 return Ok(());
@@ -104,6 +110,8 @@ impl S3Writer {
 
         self.num_blocks += 1;
         self.length += buffer.len();
+
+        println!("Flushing block {} of size {} bytes. Length after flush {}", self.num_blocks, buffer.len(), self.length);
 
         self.state.get_write_sink()?.lock().unwrap().send_bytes(buffer);
         
@@ -134,6 +142,11 @@ impl S3Writer {
         }
     }
 
+    fn get_buffer_len(&self) -> usize {
+        self.buffer.as_ref().unwrap().len()
+    }
+
+    /// Return the length written to s3 (as parts), so this is not the length of the current buffer!
     pub fn get_length(&self) -> usize {
         self.length
     }
@@ -158,9 +171,17 @@ impl io::Write for S3Writer {
         let mut num_written = 0_usize;
         let mut start_pos = 0_usize;
 
+        self.write_count += 1;
+        let report = if self.write_count % 1000 == 1 {
+            println!("{}th Write operation: num_blocks_written={}  and current block-size={} input={} bytes", self.write_count, self.num_blocks, self.length, data.len());
+            true
+        } else { false };
+
         while start_pos < data.len() {
 
+            if report { println!("Check buffer")};
             self.check_get_buffer();
+            if report { println!("Check buffer done")};
 
             let buff_space = self.block_size - self.buffer.as_ref().unwrap().len();
             let remaining_data = data.len() - start_pos;
@@ -170,8 +191,11 @@ impl io::Write for S3Writer {
             let bytes_to_write = &data[start_pos..end_pos];
 
             self.buffer.as_mut().unwrap().put(bytes_to_write);
-            
-            if self.buffer.as_ref().unwrap().len() >= self.block_size {
+
+            if report { println!("Buffer-length = {}", self.get_buffer_len())};
+
+            if self.get_buffer_len() >= self.block_size {
+                if report { println!("About to flush buffer of length {}", self.get_buffer_len())};
                 if let Err(err) = self.flush_aux() {
                     eprintln!("Observed error during flush of block {}", self.num_blocks);
                     return Err(err);
@@ -186,7 +210,23 @@ impl io::Write for S3Writer {
 
     // flush the current buffer
     fn flush(&mut self) -> io::Result<()> {
+        if self.get_buffer_len() < MIN_CHUNK_SIZE {
+            self.ignore_flush_events +=1;
+            if self.ignore_flush_events % 1000 == 1 {
+                eprintln!("{}th flush-ignore: Buffer-length {} smaller than {MIN_CHUNK_SIZE} of S3 so ignoring flush.", self.ignore_flush_events, self.length); 
+            }
+            return Ok(())
+        }
         self.flush_aux()
     }
     
+}
+
+
+impl Drop for S3Writer {
+    fn drop(&mut self) {
+        println!("Drop trait triggered");
+        self.flush_aux().expect("Failed to flush in drop-trait.");
+        //self.close();
+    }
 }
