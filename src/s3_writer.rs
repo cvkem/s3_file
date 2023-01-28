@@ -63,9 +63,12 @@ impl S3Writer {
     
     /// create a new S3File with an LRU-cache to support fast (sequential) read operations
     pub fn new(bucket_name: String, object_name: String, block_size: usize) -> Self {
-        if block_size < MIN_CHUNK_SIZE {
+        let block_size = if block_size < MIN_CHUNK_SIZE {
             println!("The minimal block-size for a multi-part upload is 5Mb!");
-        }
+            MIN_CHUNK_SIZE
+        } else {
+            block_size
+        };
 
         Self{
             bucket_name,
@@ -120,30 +123,41 @@ impl S3Writer {
 
 
     /// flush all data and close the S3Writer.
-    pub fn close(mut self) -> io::Result<()> {
-        if self.state.is_multipart() {
-            self.flush_aux()?
-        }
+    pub fn close_aux(&mut self) -> io::Result<()> {
+        if !self.state.is_done() {
+            self.flush_aux()?;
 
-        match &self.state {
-            S3WriterState::None if self.buffer == None => Ok(()),
-            S3WriterState::None  =>  {
-                    // we can write the buffer in one pass. Some duplication of code in Flush_aux.
-                    // however, using flush_aux fails when this is the first buffer and exactly contains block_size
-                    // the alternative is to increase block-size by 1, which is ugly, but would work too.
-                    let buffer = self.buffer.take().unwrap().freeze(); 
-                    ObjectWriter::single_shot_upload(&self.bucket_name, &self.object_name, buffer)?;
-                    // we are ready so return
-                    self.state = S3WriterState::Done;
-                    Ok(())
-                },
-            S3WriterState::Done => Ok(()), 
-            S3WriterState::Multipart(write_sink) => write_sink.lock().unwrap().close()
+            match &self.state {
+                S3WriterState::None if self.buffer == None => Ok(()),
+                S3WriterState::None  =>  {
+                        // we can write the buffer in one pass. Some duplication of code in Flush_aux.
+                        // however, using flush_aux fails when this is the first buffer and exactly contains block_size
+                        // the alternative is to increase block-size by 1, which is ugly, but would work too.
+                        let buffer = self.buffer.take().unwrap().freeze(); 
+                        ObjectWriter::single_shot_upload(&self.bucket_name, &self.object_name, buffer)?;
+                        // we are ready so return
+                        self.state = S3WriterState::Done;
+                        Ok(())
+                    },
+                S3WriterState::Done => Ok(()), 
+                S3WriterState::Multipart(write_sink) => write_sink.lock().unwrap().close()
+            }
+        } else {
+            Ok(())
         }
+    }
+    
+    
+    /// flush all data and close the S3Writer.
+    pub fn close(mut self) -> io::Result<()> {
+        self.close_aux()
     }
 
     fn get_buffer_len(&self) -> usize {
-        self.buffer.as_ref().unwrap().len()
+        match self.buffer.as_ref() {
+            Some(x) => x.len(),
+            None => 0
+        }
     }
 
     /// Return the length written to s3 (as parts), so this is not the length of the current buffer!
@@ -171,6 +185,9 @@ impl io::Write for S3Writer {
         let mut num_written = 0_usize;
         let mut start_pos = 0_usize;
 
+        if data.len() == 0 {
+            println!("Empty buffer: No data provided to write.");
+        }
         self.write_count += 1;
         let report = if self.write_count % 1000 == 1 {
             println!("{}th Write operation: num_blocks_written={}  and current block-size={} input={} bytes", self.write_count, self.num_blocks, self.length, data.len());
@@ -226,7 +243,9 @@ impl io::Write for S3Writer {
 impl Drop for S3Writer {
     fn drop(&mut self) {
         println!("Drop trait triggered");
-        self.flush_aux().expect("Failed to flush in drop-trait.");
+        if !self.state.is_done() {
+            self.flush_aux().expect("Failed to flush in drop-trait.");
+        }
         //self.close();
     }
 }

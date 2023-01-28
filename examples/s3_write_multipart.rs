@@ -3,40 +3,44 @@ use std::{
     time::Instant
 };
 use futures::executor::block_on;
-use s3_file::{s3_aux, get_region_client, S3Writer};
+use s3_file::{
+    async_bridge,
+    s3_aux, 
+    get_region_client, 
+    S3Writer};
 use tokio;
 use uuid::Uuid;
 
 const TEST_BUCKET_PREFIX: &str = "doc-example-bucket-";
+
 
 fn create_test_bucket() -> String {
     let bucket_name = format!("{}{}", TEST_BUCKET_PREFIX, Uuid::new_v4().to_string());
 
     // for some reason this function does not need a runtime yet. The S3_aux::create_bucket does need it.
     let (region, client) = block_on(get_region_client());
+    let create_bucket = || s3_aux::create_bucket(&client, &bucket_name, region.as_ref());
 
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-
-    rt.block_on(s3_aux::create_bucket(&client, &bucket_name, region.as_ref()))
-        .expect("Failed to create bucket");
+    async_bridge::run_async(create_bucket).unwrap();
 
     bucket_name
 }
 
-const NUM_ALPHA: usize = 200_000;
+const NUM_ALPHA: usize = 2_000; //200_000;
 
-const THOUSAND_BLOCKS: bool = false;
+const THOUSAND_BLOCKS: bool = true;
 
-fn main() {
+
+#[tokio::main]
+async fn main() {
+//fn main() {
 
     let bucket_name = create_test_bucket();
     let object_name = "alphabeth".to_owned();
 
     println!("About to create {bucket_name}:{object_name}");
 
+//    let mut s3_writer = S3Writer::new(bucket_name, object_name, 1024*1024*5+1);  // minimal part-size is 5Mb
     let mut s3_writer = S3Writer::new(bucket_name, object_name, 1024*1024*5+1);  // minimal part-size is 5Mb
 
     let alphabeth = b"abcdefghijklmnopqrstuvwxyz\n";
@@ -46,6 +50,7 @@ fn main() {
 
     if THOUSAND_BLOCKS {
         let mut content = [0u8; NUM_ALPHA*27/1000];
+        assert!(content.len() > 0, "There is no content");
         for i in 0..(NUM_ALPHA/1000) {
             let start = i * 27;
             let target_region = &mut content[start..(start+27)];

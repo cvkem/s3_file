@@ -4,6 +4,7 @@ pub use s3_reader::S3Reader;
 pub use s3_writer::S3Writer;
 
 mod client;
+pub mod async_bridge;
 pub mod s3_aux;
 mod lru_cache;
 mod object_reader;
