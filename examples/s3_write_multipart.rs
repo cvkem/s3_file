@@ -8,7 +8,6 @@ use s3_file::{
     s3_aux, 
     get_region_client, 
     S3Writer};
-use tokio;
 use uuid::Uuid;
 
 const TEST_BUCKET_PREFIX: &str = "doc-example-bucket-";
@@ -31,9 +30,9 @@ const NUM_ALPHA: usize = 2_000; //200_000;
 const THOUSAND_BLOCKS: bool = true;
 
 
-#[tokio::main]
-async fn main() {
-//fn main() {
+//#[tokio::main]
+//async fn main() {
+fn main() {
 
     let bucket_name = create_test_bucket();
     let object_name = "alphabeth".to_owned();
