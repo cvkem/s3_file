@@ -19,7 +19,7 @@ fn create_test_bucket() -> String {
 
     // for some reason this function does not need a runtime yet. The S3_aux::create_bucket does need it.
     let (region, client) = block_on(get_region_client());
-    let create_bucket = || s3_aux::create_bucket(&client, &bucket_name, region.as_ref());
+    let create_bucket = s3_aux::create_bucket(&client, &bucket_name, region.as_ref());
 
     async_bridge::run_async(create_bucket).unwrap();
 
