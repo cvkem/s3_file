@@ -166,3 +166,12 @@ impl ObjectWriterAux for ObjectWriter {
     }
 
 }
+
+impl Drop for ObjectWriter {
+    fn drop(&mut self) {
+        if !self.closed {
+            println!("WARNING: Drop called on file that is not close. Closing now (in blocking call).");
+            async_bridge::run_async(self.close()).unwrap();
+        }
+    }
+}

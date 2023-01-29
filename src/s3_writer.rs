@@ -1,5 +1,6 @@
 use std::{
     cmp,
+    fmt,
     io,
     sync::{Arc, Mutex}, 
 //    sync::mpsc,
@@ -10,11 +11,22 @@ use crate::write_sink::WriteSink;
 use crate::object_writer::{ObjectWriter, MIN_CHUNK_SIZE};
 
 
-
 enum S3WriterState {
     None,
     Multipart(Arc<Mutex<WriteSink>>),
     Done   // either a single file uploaded, of ObjectWriter has been closed.
+}
+
+impl fmt::Display for S3WriterState {
+    // This trait requires `fmt` with this exact signature.
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let state = match &self {
+            S3WriterState::None => "None",
+            S3WriterState::Multipart(_) => "Multipart<Arc<Mutex<WriteSink>>>",
+            S3WriterState::Done => "Done"
+        };
+        write!(f, "{}", state)
+    }
 }
 
 
@@ -140,9 +152,16 @@ impl S3Writer {
                         Ok(())
                     },
                 S3WriterState::Done => Ok(()), 
-                S3WriterState::Multipart(write_sink) => write_sink.lock().unwrap().close()
+                S3WriterState::Multipart(write_sink) => {
+                    println!("Closing the write_sink, trying to get lock");
+                    let mut wslock = write_sink.lock().unwrap();
+                    println!("Write-sink lock obtained, now calling close on object.");
+                    wslock.close()?;
+                    Ok(())
+                }
             }
         } else {
+            println!("WARNING: calling close while S3Writer in state 'Done' already!! Doing nothing.");
             Ok(())
         }
     }
@@ -242,10 +261,11 @@ impl io::Write for S3Writer {
 
 impl Drop for S3Writer {
     fn drop(&mut self) {
-        println!("Drop trait triggered");
+        println!("Drop trait triggered for an S3Writer {}:{}  with state {}", self.bucket_name, self.object_name, self.state);
         if !self.state.is_done() {
-            self.flush_aux().expect("Failed to flush in drop-trait.");
-        }
+            // close needed to ensure multipart objects are finalized (consolidated to single Object)
+            self.close_aux().expect("Failed to flush in drop-trait.");
+        } 
         //self.close();
     }
 }
