@@ -58,7 +58,7 @@ impl ObjectWriter {
     }
 
     /// static Upload a file as a single_shot upload.
-    /// Used for small files, as multi-part uploads require all chuncks to be at least 5Mb, so that can not be used for ssmall files.
+    /// Used for small files, as multi-part uploads require all chuncks to be at least 5Mb, so that can not be used for small files.
     pub fn single_shot_upload(bucket_name: &str, object_name: &str, buffer: Bytes) -> io::Result<()> {
         let res = async_bridge::run_async(async move {
             let client = client::get_client().await;

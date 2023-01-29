@@ -4,6 +4,7 @@ use std::{
 };
 use bytes::Bytes;
 use tokio;
+use crate::async_bridge;
 use crate::object_writer::{ObjectWriter, ObjectWriterAux};
 
 /// WriteSink is a bridge between the synchronous world and the Asyncronous AWS-S3-library and creates a separate thread for async writing of S3-objects.
@@ -63,8 +64,10 @@ impl WriteSink {
 
     /// Send a chunk of Bytes to the object.
     pub fn send_bytes(&self, bytes: Bytes) {
-        match self.send_channel.as_ref().unwrap().blocking_send(bytes) {
-            Ok(()) => {},
+        let channel = self.send_channel.as_ref().unwrap();
+        match async_bridge::run_async(channel.send(bytes)) {
+//            match self.send_channel.as_ref().unwrap().blocking_send(bytes) {
+                Ok(()) => {},
             Err(_) => panic!("The shared runtime has shut down."),
         }
     }

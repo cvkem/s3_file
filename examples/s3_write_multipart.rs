@@ -25,14 +25,15 @@ fn create_test_bucket() -> String {
     bucket_name
 }
 
-const NUM_ALPHA: usize = 2_000; //200_000;
+// do not make this variable much larger, as this block is passed over the stack and blows up the default stack of the main thread.
+const NUM_ALPHA: usize = 250_000;
 
 const THOUSAND_BLOCKS: bool = true;
 
 
-//#[tokio::main]
-//async fn main() {
-fn main() {
+#[tokio::main]
+async fn main() {
+//fn main() {
 
     let bucket_name = create_test_bucket();
     let object_name = "alphabeth".to_owned();
@@ -48,7 +49,7 @@ fn main() {
     let timer_2 = Instant::now();
 
     if THOUSAND_BLOCKS {
-        let mut content = [0u8; NUM_ALPHA*27/1000];
+        let mut content = Box::new([0u8; NUM_ALPHA*27/1000]);
         assert!(content.len() > 0, "There is no content");
         for i in 0..(NUM_ALPHA/1000) {
             let start = i * 27;
@@ -61,7 +62,7 @@ fn main() {
 
         let mut num_written = 0;
         for _i in 0..1000 {
-            match s3_writer.write(&content) {
+            match s3_writer.write(&*content) {
                 Ok(res) => num_written += res,
                 Err(err) => eprintln!("write failed with {err:?}")
             }    
