@@ -92,7 +92,7 @@ async fn main() {
     
     }
 
-    println!("Reported length of object: {}", s3_writer.get_length());
+    println!("Reported length of object: {}", s3_writer.get_flushed_bytes());
 
     match s3_writer.flush() {
         Ok(()) => (),
@@ -101,7 +101,7 @@ async fn main() {
 
     println!("==>  Flushed all data Duration  {:?}", timer.elapsed());
 
-    println!("Reported length of object (after Flush): {}", s3_writer.get_length());
+    println!("Reported length of object (after Flush): {}", s3_writer.get_flushed_bytes());
 
 
     if let Err(err) = s3_writer.close() {

@@ -52,8 +52,8 @@ pub struct S3Writer {
     block_size: usize,
     state: S3WriterState,
     buffer: Option<BytesMut>,
-    num_blocks: usize,
-    length: usize,
+    flushed_num_blocks: usize,
+    flushed_bytes: usize,
     ignore_flush_events: usize,
     write_count: usize
 }
@@ -76,8 +76,8 @@ impl S3Writer {
             block_size,
             state: S3WriterState::None,
             buffer: None,
-            num_blocks: 0,
-            length: 0,  //only updated when the buffer is flushed to S3.
+            flushed_num_blocks: 0,
+            flushed_bytes: 0,  //only updated when the buffer is flushed to S3.
             ignore_flush_events: 0,
             write_count: 0
         }
@@ -111,10 +111,10 @@ impl S3Writer {
             }
         }
 
-        self.num_blocks += 1;
-        self.length += buffer.len();
+        self.flushed_num_blocks += 1;
+        self.flushed_bytes += buffer.len();
 
-        println!("Flushing block {} of size {} bytes. Length after flush {}", self.num_blocks, buffer.len(), self.length);
+        println!("Flushing block {} of size {} bytes and bytes-flushed={}", self.flushed_num_blocks, buffer.len(), self.flushed_bytes);
 
         self.state.get_write_sink()?.lock().unwrap().send_bytes(buffer);
         
@@ -161,8 +161,8 @@ impl S3Writer {
     }
 
     /// Return the length written to s3 (as parts), so this is not the length of the current buffer!
-    pub fn get_length(&self) -> usize {
-        self.length
+    pub fn get_flushed_bytes(&self) -> usize {
+        self.flushed_bytes
     }
 
 
@@ -190,7 +190,7 @@ impl io::Write for S3Writer {
         }
         self.write_count += 1;
         let report = if self.write_count % 1000 == 1 {
-            println!("{}th Write operation: num_blocks_written={}  and current block-size={} input={} bytes", self.write_count, self.num_blocks, self.length, data.len());
+            println!("{}th Write operation: flushed_num_blocks={}  and flushed_bytes={} input-data={} bytes", self.write_count, self.flushed_num_blocks, self.flushed_bytes, data.len());
             true
         } else { false };
 
@@ -214,7 +214,7 @@ impl io::Write for S3Writer {
             if self.get_buffer_len() >= self.block_size {
                 if report { println!("About to flush buffer of length {}", self.get_buffer_len())};
                 if let Err(err) = self.flush_aux() {
-                    eprintln!("Observed error during flush of block {}", self.num_blocks);
+                    eprintln!("Observed error during flush of block {}", self.flushed_num_blocks);
                     return Err(err);
                 };
             }
@@ -230,7 +230,7 @@ impl io::Write for S3Writer {
         if self.get_buffer_len() < MIN_CHUNK_SIZE {
             self.ignore_flush_events +=1;
             if self.ignore_flush_events % 1000 == 1 {
-                eprintln!("{}th flush-ignore: Buffer-length {} smaller than {MIN_CHUNK_SIZE} of S3 so ignoring flush.", self.ignore_flush_events, self.length); 
+                eprintln!("{}th flush-ignore: Buffer-length {} smaller than {MIN_CHUNK_SIZE} of S3 so ignoring flush.", self.ignore_flush_events, self.flushed_bytes); 
             }
             return Ok(())
         }
