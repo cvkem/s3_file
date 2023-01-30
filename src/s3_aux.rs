@@ -180,6 +180,7 @@ pub async fn upload_object(
     body: &[u8]
 ) -> Result<(), Error> {
 //    let body = ByteStream::from_static(UPLOAD_CONTENT);
+    println!("The provided bytes-buffer have length {}\nTransform to ByteStream now", body.len());
     let body = ByteStream::from(Vec::from(body));
     let fut = client
         .put_object()
@@ -190,7 +191,15 @@ pub async fn upload_object(
         .send();
     println!("The future has been prepared\nNow await it.");
     
-    fut.await?;
+    match fut.await {
+        Ok(put_obj_out) => {
+            println!("The upload returned {:?}", put_obj_out);
+        },
+        Err(err) => {
+            println!("Write failed: {err:?}");
+            return Err(err.into())
+        }
+    };
 
     println!("Uploaded to bucket: {bucket_name}:{object_name}");
     Ok(())
