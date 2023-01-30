@@ -8,7 +8,7 @@ use bytes::Bytes;
 use futures::executor::block_on;
 use async_trait::async_trait;
 
-use crate::{client, s3_aux};
+use crate::{client, s3_aux, async_bridge};
 
 
 
@@ -41,7 +41,7 @@ impl ObjectReader {
     /// get the length when available, and otherwise compute it.
     pub fn get_length(&mut self) -> IOResult<u64> {
         let length_ref = self.length.get_or_insert_with(|| {
-            block_on(
+            async_bridge::run_async(
                 async {
                     s3_aux::head_object(&self.client, &self.bucket, &self.object)
                     .await
