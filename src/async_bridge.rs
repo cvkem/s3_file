@@ -12,7 +12,7 @@ pub fn run_async<F>(action: F) -> F::Output
         // A runtime is running at the moment, so a block_on current executor is performed
         Ok(_) => block_on(action),
         // No async runtime, so create one and launch this task on it 
-        // TODO: check duration of lanching a runtime
+        // TODO: check duration of lanuching a runtime
         Err(err) => {
             println!("No runtime running. When retrieving runtime got {err:?}\nStart temporary (multi-threaded) runtime now.");
             tokio::runtime::Runtime::new()

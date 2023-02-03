@@ -11,7 +11,7 @@ use aws_sdk_s3::model::{
 };
 use aws_sdk_s3::output::{GetObjectOutput, HeadObjectOutput, ListObjectsV2Output};
 use aws_sdk_s3::types::ByteStream;
-use aws_sdk_s3::{Client, Error};
+use aws_sdk_s3::{Client, Error, Error::Unhandled};
 use std::str;
 
 
@@ -50,9 +50,10 @@ pub async fn delete_objects(client: &Client, bucket_name: &str) -> Result<usize,
     let objects: ListObjectsV2Output = client.list_objects_v2().bucket(bucket_name).send().await?;
     match objects.key_count {
         0 => Ok(num_obj),
-        _ => Err(Error::Unhandled(Box::from(
-            "There were still objects left in the bucket.",
-        ))),
+        // _ => Err(Error::unhandled(
+        //     "There were still objects left in the bucket.",
+        // ))
+        _ => panic!("There were still objects left in the bucket.")  // quick fix as I can not find how Unhandled eats a string.
     }
 }
 // snippet-end:[rust.example_code.s3.basics.delete_objects]
