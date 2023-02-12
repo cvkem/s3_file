@@ -35,6 +35,9 @@ const NUM_BLOCKS: i32 = 2;
 async fn main() {
 //fn main() {
 
+    use console_subscriber;
+    console_subscriber::init();
+
     let bucket_name = create_test_bucket();
     let object_name = "alphabeth".to_owned();
 
@@ -56,13 +59,13 @@ async fn main() {
         }        
     }
 
-    println!("Writen bytes= {num_written}");
-    println!("Reported length of object: flushed_bytes={}", s3_writer.get_flushed_bytes());
+    // println!("Writen bytes= {num_written}");
+    // println!("Reported length of object: flushed_bytes={}", s3_writer.get_flushed_bytes());
 
-    match s3_writer.flush() {
-        Ok(()) => (),
-        Err(err) => eprintln!("Flush failed: {err:?}")
-    };
+    // match s3_writer.flush() {
+    //     Ok(()) => (),
+    //     Err(err) => eprintln!("Flush failed: {err:?}")
+    // };
 
     println!("==>  Flushed all data Duration  {:?}", timer.elapsed());
     println!("Reported length of object (after Flush): flushed_bytes={}", s3_writer.get_flushed_bytes());
