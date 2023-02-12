@@ -30,10 +30,12 @@ impl WriteSink {
         // The runtime is created before spawning the thread
         // to more cleanly forward errors if the `unwrap()`
         // panics.
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
+        // OLD version: remove
+        // let rt = tokio::runtime::Builder::new_current_thread()
+        //     .enable_all()
+        //     .build()
+        //     .unwrap();
+        let rt = tokio::runtime::Runtime::new().unwrap();
 
         let handle = thread::spawn(move || {
             let mut obj_writer = ObjectWriter::new(bucket_name, object_name);

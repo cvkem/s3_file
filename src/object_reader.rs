@@ -41,9 +41,13 @@ impl ObjectReader {
     /// get the length when available, and otherwise compute it.
     pub fn get_length(&mut self) -> IOResult<u64> {
         let length_ref = self.length.get_or_insert_with(|| {
+            // copy data such that the future (result async function) is 'static 
+            let bucket = self.bucket.to_owned();
+            let object = self.object.to_owned();
+            let client = self.client.clone();
             async_bridge::run_async(
-                async {
-                    s3_aux::head_object(&self.client, &self.bucket, &self.object)
+                async move {
+                    s3_aux::head_object(&client, &bucket, &object)
                     .await
                     .content_length() as usize})});
         Ok(*length_ref as u64)

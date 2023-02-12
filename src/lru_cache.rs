@@ -7,9 +7,9 @@ use bytes::Bytes;
 use futures::executor::block_on;
 
 
-use crate::object_reader::{
+use crate::{object_reader::{
     GetBytes,
-    ObjectReader};
+    ObjectReader}, async_bridge};
 
 
 pub struct ObjBlock {
@@ -84,7 +84,10 @@ impl LruCache {
             };
             self.cache.push(Arc::new(new_block));
         };
-        block_on(f);
+///        block_on(f);
+        use async_bridge;
+        async_bridge::run_async(f);
+        
         self.get_block_arc(self.cache.len() - 1)
     }
 

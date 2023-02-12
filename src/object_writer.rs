@@ -60,7 +60,10 @@ impl ObjectWriter {
     /// static Upload a file as a single_shot upload.
     /// Used for small files, as multi-part uploads require all chuncks to be at least 5Mb, so that can not be used for small files.
     pub fn single_shot_upload(bucket_name: &str, object_name: &str, buffer: Bytes) -> io::Result<()> {
-        let res = async_bridge::run_async(async move {
+//        let res = async_bridge::run_async(async move {
+    let res = tokio::runtime::Runtime::new()
+    .unwrap()
+    .block_on(async move{
             let client = client::get_client().await;
             println!("Created a client ");
            match s3_aux::upload_object(&client, bucket_name, object_name, buffer.borrow()).await {
@@ -171,7 +174,8 @@ impl Drop for ObjectWriter {
     fn drop(&mut self) {
         if !self.closed {
             println!("WARNING: Drop called on file that is not close. Closing now (in blocking call).");
-            async_bridge::run_async(self.close()).unwrap();
+            let close_future = self.close();
+            async_bridge::run_async(close_future).unwrap();
         }
     }
 }
