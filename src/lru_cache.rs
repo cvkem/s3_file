@@ -1,10 +1,9 @@
 use std::{
     fmt,
-    sync::{Arc, Mutex},
-    thread,
+    sync::Arc,
     time::Instant};
+use tokio::sync::Mutex;
 use bytes::Bytes;
-use futures::executor::block_on;
 
 
 use crate::{object_reader::{
@@ -21,7 +20,7 @@ pub struct ObjBlock {
 pub struct LruCache {
     block_size: usize,
     source: Arc<Mutex<ObjectReader>>,
-    pub cache: Vec<Arc<ObjBlock>>  // should be private, but then find_cache_block should return a reference. TODO: fix this
+    cache: Vec<Arc<ObjBlock>>  // should be private, but then find_cache_block should return a reference. TODO: fix this
 }
 
 impl fmt::Debug for LruCache {
@@ -72,10 +71,12 @@ impl LruCache {
         //let end_block = cmp::min(block_start + self.block_size, self.get_length());
         let block_end = block_start + self.block_size - 1;  // end is inclusive
 
+        let source = self.source.clone();
         // create the block and fill it with data
-        let f = async {
-
-            let data = self.source.lock().unwrap().get_bytes(block_start, block_end).await;
+        let f = async move {
+            let obj_rdr = source.lock().await;
+            let get_bytes_fut = obj_rdr.get_bytes(block_start, block_end);
+            let data = get_bytes_fut.await;
             
             let new_block = ObjBlock {
                 start: block_start,
@@ -84,7 +85,7 @@ impl LruCache {
             };
             self.cache.push(Arc::new(new_block));
         };
-///        block_on(f);
+        // block_on(f);
         use async_bridge;
         async_bridge::run_async(f);
         

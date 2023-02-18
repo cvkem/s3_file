@@ -15,6 +15,10 @@ mod write_sink;
 
 mod chunk_reader;
 
+#[macro_use]
+extern crate lazy_static;
+
+
 
 #[cfg(test)]
 pub mod tests {

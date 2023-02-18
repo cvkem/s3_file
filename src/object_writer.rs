@@ -60,10 +60,20 @@ impl ObjectWriter {
     /// static Upload a file as a single_shot upload.
     /// Used for small files, as multi-part uploads require all chuncks to be at least 5Mb, so that can not be used for small files.
     pub fn single_shot_upload(bucket_name: &str, object_name: &str, buffer: Bytes) -> io::Result<()> {
-//        let res = async_bridge::run_async(async move {
-    let res = tokio::runtime::Runtime::new()
-    .unwrap()
-    .block_on(async move{
+    // let res = tokio::runtime::Runtime::new()
+    // .unwrap()
+    // .block_on(async move{
+    //         let client = client::get_client().await;
+    //         println!("Created a client ");
+    //        match s3_aux::upload_object(&client, bucket_name, object_name, buffer.borrow()).await {
+    //                 Ok(()) => {
+    //                 println!("Finished the upload of buffer with length: {}.", buffer.len());
+    //                 Ok(())
+    //             },
+    //             Err(err) => Err(io::Error::new(io::ErrorKind::Other, format!("{err:?}")))
+    //         }    
+    //     });
+        let res = async_bridge::run_async(async move {
             let client = client::get_client().await;
             println!("Created a client ");
            match s3_aux::upload_object(&client, bucket_name, object_name, buffer.borrow()).await {
@@ -74,6 +84,7 @@ impl ObjectWriter {
                 Err(err) => Err(io::Error::new(io::ErrorKind::Other, format!("{err:?}")))
             }    
         });
+
         res
     }
 

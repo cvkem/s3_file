@@ -1,13 +1,12 @@
 
 use aws_sdk_s3::Client;
-use std::{
-    io::Result as IOResult,
-    sync::{
-        MutexGuard}};
+use std::io::Result as IOResult;
+    // sync::{
+    //     MutexGuard}};
 use bytes::Bytes;
-use futures::executor::block_on;
+//use futures::executor::block_on;
 use async_trait::async_trait;
-
+use tokio::sync::MutexGuard; 
 use crate::{client, s3_aux, async_bridge};
 
 
@@ -28,8 +27,9 @@ pub struct ObjectReader {
 
 impl ObjectReader {
     pub fn new(bucket: String, object: String) -> Self {
-        Self{client: block_on(client::get_client()), 
-            bucket, 
+        Self{client: async_bridge::run_async(client::get_client()), 
+//            Self{client: block_on(client::get_client()), 
+                bucket, 
             object, 
             length: None}
     }

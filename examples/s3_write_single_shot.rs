@@ -31,12 +31,12 @@ const NUM_ALPHA: usize = 250;
 const NUM_BLOCKS: i32 = 2;
 
 
-#[tokio::main]
-async fn main() {
-//fn main() {
+//#[tokio::main]
+// async fn main() {
+fn main() {
 
-    use console_subscriber;
-    console_subscriber::init();
+    // use console_subscriber;
+    // console_subscriber::init();
 
     let bucket_name = create_test_bucket();
     let object_name = "alphabeth".to_owned();

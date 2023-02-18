@@ -27,7 +27,7 @@ pub struct S3ReaderChunk {
 impl S3ReaderChunk {
     pub fn new(s3_reader: &S3Reader, start: u64, length: usize) -> Self {
         let mut reader = s3_reader.clone();
-        reader.position = start as usize;
+        reader.set_position_s(start.try_into().unwrap());
         let reader = RefCell::new(reader);
         Self {
             reader,
@@ -43,7 +43,7 @@ impl Read for S3ReaderChunk {
     /// sequential read of the chunk, ut do not read beyond the end of the chunk!
     fn read(&mut self, buff: &mut [u8]) -> io::Result<usize> {
         let len = buff.len();
-        let pos = {self.reader.borrow().position};
+        let pos = {self.reader.borrow().get_position_s()};
         let max_len = self.end - (pos as u64);
         let max_buff_len: usize = cmp::min(len, max_len.try_into().unwrap());
         let max_buff = &mut buff[..max_buff_len];
