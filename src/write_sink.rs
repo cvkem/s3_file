@@ -4,7 +4,7 @@ use std::{
 };
 use bytes::Bytes;
 use tokio;
-use crate::async_bridge;
+use async_bridge;
 use crate::object_writer::{ObjectWriter, ObjectWriterAux};
 
 /// WriteSink is a bridge between the synchronous world and the Asyncronous AWS-S3-library and creates a separate thread for async writing of S3-objects.

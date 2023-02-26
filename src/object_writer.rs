@@ -7,8 +7,7 @@ use std::{
     mem};
 use bytes::Bytes;
 use async_trait::async_trait;
-use futures::executor::block_on;
-use crate::async_bridge;
+use async_bridge;
 
 use crate::{client, s3_aux};
 
@@ -40,7 +39,7 @@ pub trait ObjectWriterAux {
 impl ObjectWriter {
 
     pub fn new(bucket: String, object: String) -> Self {
-        Self{client: block_on(client::get_client()), 
+        Self{client: async_bridge::run_async(client::get_client()), 
             bucket_name: bucket, 
             object_name: object,
             upload_id: None,

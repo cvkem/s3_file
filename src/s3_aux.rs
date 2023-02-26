@@ -180,15 +180,7 @@ pub async fn upload_object(
     object_name: &str,
     body: &[u8]
 ) -> Result<(), Error> {
-//    let body = ByteStream::from_static(UPLOAD_CONTENT);
-    println!("The provided bytes-buffer have length {}\nTransform to ByteStream now", body.len());
     let body = ByteStream::from(Vec::from(body));
-
-    println!("TMP: About to create the upload-future [press NewLine]");
-    let mut null = Default::default();
-    std::io::stdin().read_line(&mut null);
-    println!("Now await it.");
-
 
     let fut = client
         .put_object()
@@ -197,11 +189,6 @@ pub async fn upload_object(
         //.body(body.unwrap())
         .body(body)
         .send();
-
-
-    println!("TMP: The future has been prepared [press NewLine]");
-    std::io::stdin().read_line(&mut null);
-    println!("Now await it.");
     
     match fut.await {
         Ok(put_obj_out) => {

@@ -4,11 +4,12 @@ use std::{
     time::Instant};
 use tokio::sync::Mutex;
 use bytes::Bytes;
+use async_bridge;
 
 
-use crate::{object_reader::{
+use crate::object_reader::{
     GetBytes,
-    ObjectReader}, async_bridge};
+    ObjectReader};
 
 
 pub struct ObjBlock {
@@ -87,7 +88,6 @@ impl LruCache {
             self.cache.push(Arc::new(new_block));
         };
         // block_on(f);
-        use async_bridge;
         async_bridge::run_async(f);
         
         self.get_block_arc(self.cache.len() - 1)

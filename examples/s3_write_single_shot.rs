@@ -2,13 +2,12 @@ use std::{
     io::Write,
     time::Instant
 };
-use futures::executor::block_on;
 use s3_file::{
-    async_bridge,
     s3_aux, 
     get_region_client, 
     S3Writer};
 use uuid::Uuid;
+use async_bridge;
 
 const TEST_BUCKET_PREFIX: &str = "doc-example-bucket-";
 
@@ -17,7 +16,7 @@ fn create_test_bucket() -> String {
     let bucket_name = format!("{}{}", TEST_BUCKET_PREFIX, Uuid::new_v4().to_string());
 
     // for some reason this function does not need a runtime yet. The S3_aux::create_bucket does need it.
-    let (region, client) = block_on(get_region_client());
+    let (region, client) = async_bridge::run_async(get_region_client());
     let create_bucket = s3_aux::create_bucket(&client, &bucket_name, region.as_ref());
 
     async_bridge::run_async(create_bucket).unwrap();

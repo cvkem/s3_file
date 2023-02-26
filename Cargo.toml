@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tracing = { version = "0.1", features = ["log"] }
-tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
+#tracing = { version = "0.1", features = ["log"] }
+#tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt"] }
 # for AWS
 # aws-types = { path = "../aws-sdk-rust/sdk/aws-types" }
 aws-config = "0.54.1"
@@ -15,18 +15,18 @@ aws-config = "0.54.1"
 aws-sdk-s3 = "0.24.0"
 # aws-sdk-s3 =  { path = "../aws-sdk-rust/sdk/s3" }
 # aws-smithy-http = "0.52.0"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["sync"] }
 # for debugging via tokio-console
-console-subscriber = { version = "0.1.8" }
+#console-subscriber = { version = "0.1.8" }
+async_bridge = { git = "https://github.com/cvkem/async_bridge.git"}
 # 
 #lambda_runtime = "0.6.1"
 serde = "1.0.136"
 futures = "0.3.24"
 bytes = "1.2.1"
 async-trait = "0.1.60"
-# for parquet interace
+# for parquet interface
 parquet = { version = "30", features = ["async"] }
-lazy_static = "1.4.0"
 
 [dependencies.uuid]
 version = "0.8"

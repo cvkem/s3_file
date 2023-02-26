@@ -11,10 +11,11 @@ use std::{
     sync::Arc};
 use tokio::sync::Mutex;
 use  parquet::file::reader::Length;
+use async_bridge;
 
-
-use crate::{lru_cache::LruCache, async_bridge};
-use crate::object_reader::ObjectReader;
+use crate::{
+    lru_cache::LruCache, 
+    object_reader::ObjectReader};
 
 pub struct S3Reader {
     cache: Arc<Mutex<LruCache>>,

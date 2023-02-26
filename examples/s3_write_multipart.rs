@@ -2,13 +2,13 @@ use std::{
     io::Write,
     time::Instant
 };
-use futures::executor::block_on;
 use s3_file::{
-    async_bridge,
     s3_aux, 
     get_region_client, 
     S3Writer};
 use uuid::Uuid;
+use async_bridge;
+
 
 const TEST_BUCKET_PREFIX: &str = "doc-example-bucket-";
 

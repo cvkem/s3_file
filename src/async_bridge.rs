@@ -1,4 +1,4 @@
-
+// This file is  NOT used anymore. It has been moved to an external crate async_bridge to make is reusable.
 use std::{
     thread,
     future::Future};

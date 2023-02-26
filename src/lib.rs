@@ -1,6 +1,6 @@
-#![feature(async_fn_in_trait)]
-#![feature(ptr_to_from_bits)]
-#![feature(slice_ptr_get)]
+// #![feature(async_fn_in_trait)]
+// #![feature(ptr_to_from_bits)]
+// #![feature(slice_ptr_get)]
 
 
 pub use client::{get_client, get_region_client};
@@ -9,7 +9,6 @@ pub use s3_reader::S3Reader;
 pub use s3_writer::S3Writer;
 
 mod client;
-pub mod async_bridge;
 pub mod s3_aux;
 mod lru_cache;
 mod object_reader;
@@ -19,10 +18,6 @@ mod s3_writer;
 mod write_sink;
 
 mod chunk_reader;
-
-#[macro_use]
-extern crate lazy_static;
-
 
 
 #[cfg(test)]
