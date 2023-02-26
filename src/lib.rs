@@ -1,3 +1,8 @@
+#![feature(async_fn_in_trait)]
+#![feature(ptr_to_from_bits)]
+#![feature(slice_ptr_get)]
+
+
 pub use client::{get_client, get_region_client};
 pub use s3_aux::delete_buckets_with_prefix;
 pub use s3_reader::S3Reader;

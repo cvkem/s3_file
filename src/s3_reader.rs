@@ -1,4 +1,4 @@
-#![feature(async_fn_in_trait)]
+
 use std::{
     clone::Clone,
     cmp,
@@ -119,11 +119,33 @@ impl S3Reader {
         S3Reader { cache, source, position}
     }
 
+    fn do_nothing(buffer: &[u8]) -> usize {
+        42_usize
+    }
+
+//     /// Synchronous (blocking) version of read_segment
+//     pub fn read_segment_s(&mut self, buffer: &mut[u8], max_len: usize) -> usize {
+//         let mut self_clone = self.static_clone();
+//         let buffer_len = buffer.len();
+//         let buffer_ptr = (&buffer[0] as *const u8).to_bits();
+
+//         async_bridge::run_async(async move { 
+//             let buffer_tmp = <*const u8>::from_bits(buffer_ptr);
+//             let buffer: *const [_] = std::ptr::slice_from_raw_parts(buffer_tmp, buffer_len);
+//             self_clone.read_segment(&mut *buffer, max_len).await 
+// //            unsafe{ S3Reader::do_nothing(& *buffer) }
+//         })
+//     }
+
     /// Synchronous (blocking) version of read_segment
     pub fn read_segment_s(&mut self, buffer: &mut[u8], max_len: usize) -> usize {
-        let mut self_clone = self.static_clone();
-        async_bridge::run_async(async move { self_clone.read_segment(buffer, max_len).await })
+  
+        async_bridge::run_async(async { 
+            self.read_segment(buffer, max_len).await 
+        })
     }
+
+
 
     /// Synchronous (blocking) version of get_length()
     pub fn get_length_s(&self) -> IOResult<u64> {

@@ -73,8 +73,9 @@ impl LruCache {
 
         let source = self.source.clone();
         // create the block and fill it with data
-        let f = async move {
-            let obj_rdr = source.lock().await;
+        let f = async {
+//        let f = async move {
+                let obj_rdr = source.lock().await;
             let get_bytes_fut = obj_rdr.get_bytes(block_start, block_end);
             let data = get_bytes_fut.await;
             
